@@ -82,6 +82,7 @@ export default function filamentGoogleMapsWidget({
     callWire: function (thing) {},
 
     createMap: function () {
+      console.log("Creating map");
       window.filamentGoogleMapsAPILoaded = true;
       this.infoWindow = new google.maps.InfoWindow({
         content: "",
@@ -98,6 +99,8 @@ export default function filamentGoogleMapsWidget({
       this.center = this.config.center;
 
       this.createMarkers();
+
+      this.createPaths();
 
       this.createClustering();
 
@@ -185,6 +188,53 @@ export default function filamentGoogleMapsWidget({
         }
 
         return marker;
+      });
+    },
+    createPaths: function() {
+      console.log("creating paths");
+      if (!this.config.drawPaths) {
+          console.log("drawPaths is disabled.");
+          return; // Exit the function early if drawPaths is false
+      }
+  
+      const groupedByPath = {};
+  
+      // Group markers by pathGroup and sort by pathOrder if present
+      this.data.forEach(location => {
+          const pathGroup = location.pathGroup;
+          if (!groupedByPath[pathGroup]) {
+              groupedByPath[pathGroup] = {
+                  locations: [],
+                  color: location.color || '#FF0000', // Use the specified color or a fallback
+                  opacity: location.pathOpacity || 1.0,
+                  weight: location.pathWeight || 2,
+              };
+          }
+          groupedByPath[pathGroup].locations.push({
+              lat: parseFloat(location.location.lat),
+              lng: parseFloat(location.location.lng),
+              order: location.pathOrder || 0 // Use 0 or another default for non-ordered items
+          });
+      });
+  
+      // Sort locations within each path group by pathOrder if applicable
+      Object.values(groupedByPath).forEach(pathInfo => {
+          if (pathInfo.locations.some(loc => loc.order !== 0)) {
+              pathInfo.locations.sort((a, b) => a.order - b.order);
+          }
+      });
+  
+      // Draw a path for each path group
+      Object.entries(groupedByPath).forEach(([pathGroup, {locations, color, opacity, weight}]) => {
+          const path = new google.maps.Polyline({
+              path: locations,
+              geodesic: true,
+              strokeColor: color, // Dynamically assigned color, with fallback if not specified
+              strokeOpacity: opacity,
+              strokeWeight: weight,
+          });
+  
+          path.setMap(this.map);
       });
     },
     removeMarker: function (marker) {
@@ -336,6 +386,7 @@ export default function filamentGoogleMapsWidget({
       }
     },
     update: function (data) {
+      console.log("running map update");
       this.data = data;
       this.mergeMarkers();
       this.updateClustering();
