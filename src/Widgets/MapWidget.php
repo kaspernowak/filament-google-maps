@@ -70,6 +70,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
         'gmaps'      => '',
         'clustering' => true,
         'mapConfig'  => [],
+        'drawPaths'  => true,
     ];
 
     public function mount()
@@ -188,9 +189,12 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     public function updateMapData()
     {
         $newDataChecksum = $this->generateDataChecksum();
-
+        \Log::info('Update Table', ['newDataChecksum' => $newDataChecksum ,'dataChecksum' => $this->dataChecksum]);
         if ($newDataChecksum !== $this->dataChecksum) {
             $this->dataChecksum = $newDataChecksum;
+
+            \Log::info('Dispatching updateMapData');
+
 
             $this->dispatch('updateMapData', [
                 'data' => $this->getCachedData(),
