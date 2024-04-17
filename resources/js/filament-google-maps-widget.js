@@ -13,7 +13,7 @@ export default function filamentGoogleMapsWidget({
     mapEl: null,
     data: null,
     markers: [],
-    paths: [],
+    polylines: [],
     layers: [],
     modelIds: [],
     mapIsFilter: false,
@@ -106,11 +106,11 @@ export default function filamentGoogleMapsWidget({
         const zoom = this.map.getZoom(); 
         console.log("Getting clusterer: ", Alpine.raw(this.clusterer));   
         console.log("Getting markers: ", Alpine.raw(this.markers)); 
-        if (this.paths) {
-            Alpine.raw(this.paths).forEach(path => {
-                console.log('Adjusting path visibility for path:', path, "to:", zoom > 13 ? 'visible' : 'hidden');
-                const pathCoords = path.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
-                console.log('Zoomed path coordinates:', pathCoords);
+        if (this.polylines) {
+            Alpine.raw(this.polylines).forEach(polyline => {
+                console.log('Adjusting polyline visibility for polyline:', polyline, "to:", zoom > 13 ? 'visible' : 'hidden');
+                const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+                console.log('Zoomed polyline coordinates:', polylineCoords);
 
                 const markers = Alpine.raw(this.markers);
                 const markerCoords = markers.map(marker => ({
@@ -119,27 +119,27 @@ export default function filamentGoogleMapsWidget({
                 }));
                 console.log('Marker coordinates:', markerCoords);
                 
-                // Find each marker on the path
+                // Find each marker on the polyline
                 markers.forEach(marker => {
                     const markerLat = marker.position.lat;
                     const markerLng = marker.position.lng;
-                    const isOnPath = pathCoords.some(pathCoord =>
-                        pathCoord.lat === markerLat && pathCoord.lng === markerLng
+                    const isOnPolyline = polylineCoords.some(polylineCoord =>
+                        polylineCoord.lat === markerLat && polylineCoord.lng === markerLng
                     );
-                    console.log(`Marker at (${markerLat}, ${markerLng}) is on path: ${isOnPath}`);
+                    console.log(`Marker at (${markerLat}, ${markerLng}) is on polyline: ${isOnPolyline}`);
                 
-                    // If marker is on the path, do something with it
-                    if (isOnPath) {
+                    // If marker is on the polyline, do something with it
+                    if (isOnPolyline) {
                       const markerEl = marker.element;
                       console.log(`Marker aria described by: `, marker.title, ` marker class: `, marker.Pn, ` marker element: `, markerEl, ` map element: `, this.mapEl);
                       console.log('Does map element contain marker element?: ', this.mapEl.contains(markerEl));
                         // Access the marker's DOM element if possible
                         // Note: Google Maps API does not provide a direct way to access the marker's DOM element
                         // If you are using a custom overlay or HTML marker, you might manage this yourself
-                    path.setMap(this.mapEl.contains(markerEl) ? this.map : null);
+                    polyline.setMap(this.mapEl.contains(markerEl) ? this.map : null);
                     }
                 });
-                //path.setMap(zoom > 12 ? this.map : null);
+                //polyline.setMap(zoom > 12 ? this.map : null);
             });
         }
       }, 100);
@@ -147,13 +147,13 @@ export default function filamentGoogleMapsWidget({
 
       await this.createMarkers();
 
-      this.createPaths();
-      console.log("After Paths creation, we have paths: ", this.paths)
+      this.createPolylines();
+      console.log("After Polylines creation, we have polylines: ", this.polylines)
 
       this.createClustering();
 
       /* google.maps.event.addListener(this.clusterer, 'clusteringend', () => {
-        if(!this.config.drawPaths && this.paths.length > 0){
+        if(!this.config.drawPolylines && this.polylines.length > 0){
           return;
         }
 
@@ -161,41 +161,41 @@ export default function filamentGoogleMapsWidget({
         console.log("Getting clusterer: ", this.clusterer);
         console.log("Getting markers of clusterer: ", this.clusterer.markers);
         console.log("Getting clusters in clusterer: ", this.clusterer.clusters);
-        console.log("Getting paths on map : ", Alpine.raw(this.paths));
-        console.log("Getting paths count : ", this.paths.length);
+        console.log("Getting polylines on map : ", Alpine.raw(this.polylines));
+        console.log("Getting polylines count : ", this.polylines.length);
         this.clusterer.clusters.forEach(cluster => {
             console.log("Cluster", cluster);
             console.log("Cluster size", cluster.size);
             console.log("Cluster count", cluster.count);
             console.log("Cluster markers", cluster.markers);
             
-              Alpine.raw(this.paths).forEach((path, index) => {
+              Alpine.raw(this.polylines).forEach((polyline, index) => {
                 if(cluster.count > 1)
                 {
                   console.log('We are in an actual cluster');
-                  console.log(`Path ${index + 1}: `, path);
-                  const pathCoords = path.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }))
+                  console.log(`Polyline ${index + 1}: `, polyline);
+                  const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }))
     
                   const markers = Alpine.raw(cluster.markers);
                   const markerCoords = markers.map(marker => ({
                       lat: marker.position.lat,
                       lng: marker.position.lng
                   }));
-                  console.log('Path coordinates:', pathCoords);
+                  console.log('Polyline coordinates:', polylineCoords);
                   console.log('Marker coordinates:', markerCoords);
                   
-                  // Check if any marker is on the path
-                  const isAnyMarkerOnPath = markers.some(marker => {
+                  // Check if any marker is on the polyline
+                  const isAnyMarkerOnPolyline = markers.some(marker => {
                       const markerLat = marker.position.lat;
                       const markerLng = marker.position.lng;
-                      return pathCoords.some(pathCoord => pathCoord.lat === markerLat && pathCoord.lng === markerLng);
+                      return polylineCoords.some(polylineCoord => polylineCoord.lat === markerLat && polylineCoord.lng === markerLng);
                   });
 
-                  path.setMap(!isAnyMarkerOnPath ? this.map : null);
+                  polyline.setMap(!isAnyMarkerOnPolyline ? this.map : null);
 
               } else {
-                console.log('We are in a fake cluster, just set path on map.');
-                path.setMap(this.map);
+                console.log('We are in a fake cluster, just set polyline on map.');
+                polyline.setMap(this.map);
               }
               });    
         });
@@ -206,42 +206,42 @@ export default function filamentGoogleMapsWidget({
 
       
       google.maps.event.addListener(this.clusterer, 'clusteringend', () => {
-        console.log("Clustering operation ended on map: ", this.map, " with paths: ", this.paths);
+        console.log("Clustering operation ended on map: ", this.map, " with polylines: ", this.polylines);
     
-        if (!this.config.drawPaths || this.paths.length === 0) {
-            console.log("No paths to draw or path drawing is disabled.");
-            return; // Skip processing if path drawing is disabled or no paths are defined
+        if (!this.config.drawPolylines || this.polylines.length === 0) {
+            console.log("No polylines to draw or polyline drawing is disabled.");
+            return; // Skip processing if polyline drawing is disabled or no polylines are defined
         }
     
-        console.log(`Processing ${this.paths.length} paths.`);
+        console.log(`Processing ${this.polylines.length} polylines.`);
     
-        Alpine.raw(this.paths).forEach((path, index) => {
-            const pathCoords = path.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
-            let pathShouldBeVisible = true; // Default path visibility
-            console.log(`Path ${index + 1}: Checking clusters for visibility rules.`);
+        Alpine.raw(this.polylines).forEach((polyline, index) => {
+            const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+            let polylineShouldBeVisible = true; // Default polyline visibility
+            console.log(`Polyline ${index + 1}: Checking clusters for visibility rules.`);
     
             for (const cluster of this.clusterer.clusters) {
                 if (cluster.count > 1) { // Only consider real clusters
                     console.log(`Cluster with more than one marker found. Cluster count: ${cluster.count}`);
     
                     const markers = Alpine.raw(cluster.markers);
-                    const isAnyMarkerOnPath = markers.some(marker => 
-                        pathCoords.some(pathCoord => 
-                            pathCoord.lat === marker.position.lat && pathCoord.lng === marker.position.lng
+                    const isAnyMarkerOnPolyline = markers.some(marker => 
+                        polylineCoords.some(polylineCoord => 
+                            polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
                         )
                     );
     
-                    if (isAnyMarkerOnPath) {
-                        console.log(`Path ${index + 1}: Markers found on path, setting visibility to hidden.`);
-                        pathShouldBeVisible = false; // Set path to invisible if any marker is on the path
+                    if (isAnyMarkerOnPolyline) {
+                        console.log(`Polyline ${index + 1}: Markers found on polyline, setting visibility to hidden.`);
+                        polylineShouldBeVisible = false; // Set polyline to invisible if any marker is on the polyline
                         break; // No need to check further if one cluster already determines visibility
                     }
                 }
             }
 
-            path.setMap(pathShouldBeVisible ? this.map : null); // Apply visibility setting
+            polyline.setMap(polylineShouldBeVisible ? this.map : null); // Apply visibility setting
         });
-        console.log("Done listening on cluster end on map: ", this.map, " finished paths: ", this.paths);
+        console.log("Done listening on cluster end on map: ", this.map, " finished polylines: ", this.polylines);
 
       });   
 
@@ -601,43 +601,43 @@ export default function filamentGoogleMapsWidget({
       //console.log("Merge complete, current markers: ", this.markers);
       this.fitToBounds();
     },
-    /* createPath: function(groupedPathInfo) {
-      console.log("GroupPathInfo: ", groupedPathInfo);
+    /* createPolyline: function(groupedPolylineInfo) {
+      console.log("GroupPolylineInfo: ", groupedPolylineInfo);
       const lineSymbol = {
-          path: google.maps.SymbolPath[groupedPathInfo.symbol],
+          path: google.maps.SymbolPolyline[groupedPolylineInfo.symbol],
       };
 
-      let totalPathLength = 0;
-      const pathLengths = [];
+      let totalPolylineLength = 0;
+      const polylineLengths = [];
       const icons = [];
   
-      // First, calculate total path length and individual segment lengths
-      for (let i = 0; i < groupedPathInfo.locations.length - 1; i++) {
-          const start = groupedPathInfo.locations[i];
-          const end = groupedPathInfo.locations[i + 1];
+      // First, calculate total polyline length and individual segment lengths
+      for (let i = 0; i < groupedPolylineInfo.locations.length - 1; i++) {
+          const start = groupedPolylineInfo.locations[i];
+          const end = groupedPolylineInfo.locations[i + 1];
           const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
               new google.maps.LatLng(start.lat, start.lng),
               new google.maps.LatLng(end.lat, end.lng)
           );
-          pathLengths.push(segmentLength);
-          totalPathLength += segmentLength;
+          polylineLengths.push(segmentLength);
+          totalPolylineLength += segmentLength;
       }
   
       let accumulatedLength = 0;
-      for (let i = 0; i < pathLengths.length; i++) {
+      for (let i = 0; i < polylineLengths.length; i++) {
           let offsetPercentage;
-          accumulatedLength += pathLengths[i];
+          accumulatedLength += polylineLengths[i];
   
           // Calculate the offset based on the symbolPos value
-          if (groupedPathInfo.symbolPos === 'start') {
+          if (groupedPolylineInfo.symbolPos === 'start') {
               // For 'start', place the symbol at the beginning of each segment
-              offsetPercentage = ((accumulatedLength - (pathLengths[i] / 1.2)) / totalPathLength) * 100;
-          } else if (groupedPathInfo.symbolPos === 'end') {
+              offsetPercentage = ((accumulatedLength - (polylineLengths[i] / 1.2)) / totalPolylineLength) * 100;
+          } else if (groupedPolylineInfo.symbolPos === 'end') {
               // For 'end', place the symbol at the end of each segment
-              offsetPercentage = ((accumulatedLength - (pathLengths[i] * 0.1)) / totalPathLength) * 100;
+              offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.1)) / totalPolylineLength) * 100;
           } else {
               // For 'center' or default, place the symbol at the midpoint of each segment
-              offsetPercentage = ((accumulatedLength - (pathLengths[i] / 2)) / totalPathLength) * 100;
+              offsetPercentage = ((accumulatedLength - (polylineLengths[i] / 2)) / totalPolylineLength) * 100;
           }
   
           icons.push({
@@ -646,87 +646,87 @@ export default function filamentGoogleMapsWidget({
           });
       }
 
-      console.log("Icons for ",groupedPathInfo.symbolPos,": ", icons);
+      console.log("Icons for ",groupedPolylineInfo.symbolPos,": ", icons);
   
-      // Create the Polyline object for a single grouped path.
-      const path = new google.maps.Polyline({
-          path: groupedPathInfo.locations,
+      // Create the Polyline object for a single grouped polyline.
+      const polyline = new google.maps.Polyline({
+          path: groupedPolylineInfo.locations,
           geodesic: true,
-          strokeColor: groupedPathInfo.color, // Use the color specified in groupedPathInfo
-          strokeOpacity: groupedPathInfo.opacity,
-          strokeWeight: groupedPathInfo.weight,
+          strokeColor: groupedPolylineInfo.color, // Use the color specified in groupedPolylineInfo
+          strokeOpacity: groupedPolylineInfo.opacity,
+          strokeWeight: groupedPolylineInfo.weight,
           icons: icons,
       });
   
-      return path;
+      return polyline;
     },
-    createPaths: function() {
-      console.log("Creating paths");
-      if (!this.config.drawPaths) {
-          console.log("drawPaths is disabled.");
-          return; // Exit if drawPaths is disabled
+    createPolylines: function() {
+      console.log("Creating polylines");
+      if (!this.config.drawPolylines) {
+          console.log("drawPolylines is disabled.");
+          return; // Exit if drawPolylines is disabled
       }
   
-      const groupedByPath = {};
+      const groupedByPolyline = {};
   
-      // Group locations by pathGroup and sort by pathOrder if present
+      // Group locations by polylineGroup and sort by polylineOrder if present
       this.data.forEach(location => {
-          const pathGroup = location.pathGroup;
-          if (!groupedByPath[pathGroup]) {
-              groupedByPath[pathGroup] = {
+          const polylineGroup = location.polylineGroup;
+          if (!groupedByPolyline[polylineGroup]) {
+              groupedByPolyline[polylineGroup] = {
                   locations: [],
                   color: location.color || '#FF0000', // Default color fallback
-                  opacity: location.pathOpacity || 1.0,
-                  weight: location.pathWeight || 2,
-                  symbol: location.pathSymbol || null,
-                  symbolPos: location.pathSymbolPos || 'center',
+                  opacity: location.polylineOpacity || 1.0,
+                  weight: location.polylineWeight || 2,
+                  symbol: location.polylineSymbol || null,
+                  symbolPos: location.polylineSymbolPos || 'center',
               };
           }
-          groupedByPath[pathGroup].locations.push({
+          groupedByPolyline[polylineGroup].locations.push({
               lat: parseFloat(location.location.lat),
               lng: parseFloat(location.location.lng),
-              order: location.pathOrder || 0, // Default order
+              order: location.polylineOrder || 0, // Default order
           });
       }); */
-    createPath: function(groupedPathInfo) {
-      console.log("GroupPathInfo: ", groupedPathInfo);
+    createPolyline: function(groupedPolylineInfo) {
+      console.log("GroupPolylineInfo: ", groupedPolylineInfo);
       const lineSymbol = {
-          path: google.maps.SymbolPath[groupedPathInfo.symbol],
+          path: google.maps.SymbolPath[groupedPolylineInfo.symbol],
       };
 
       const icons = [];
 
-      if (groupedPathInfo.symbol) {
-          let totalPathLength = 0;
-          const pathLengths = [];
+      if (groupedPolylineInfo.symbol) {
+          let totalPolylineLength = 0;
+          const polylineLengths = [];
   
-          // Calculate total path length and individual segment lengths
-          for (let i = 0; i < groupedPathInfo.locations.length - 1; i++) {
-              const start = groupedPathInfo.locations[i];
-              const end = groupedPathInfo.locations[i + 1];
+          // Calculate total polyline length and individual segment lengths
+          for (let i = 0; i < groupedPolylineInfo.locations.length - 1; i++) {
+              const start = groupedPolylineInfo.locations[i];
+              const end = groupedPolylineInfo.locations[i + 1];
               const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
                   new google.maps.LatLng(start.lat, start.lng),
                   new google.maps.LatLng(end.lat, end.lng)
               );
-              pathLengths.push(segmentLength);
-              totalPathLength += segmentLength;
+              polylineLengths.push(segmentLength);
+              totalPolylineLength += segmentLength;
           }
   
           let accumulatedLength = 0;
-          for (let i = 0; i < pathLengths.length; i++) {
-              const start = groupedPathInfo.locations[i];
-              const end = groupedPathInfo.locations[i + 1];
-              accumulatedLength += pathLengths[i];
+          for (let i = 0; i < polylineLengths.length; i++) {
+              const start = groupedPolylineInfo.locations[i];
+              const end = groupedPolylineInfo.locations[i + 1];
+              accumulatedLength += polylineLengths[i];
   
               // Determine direction and calculate offset
               const isNorthwards = end.lat > start.lat; // true if end is north of start
               let offsetPercentage;
               if (isNorthwards) {
                   // If northwards, position closer to the end
-                  offsetPercentage = ((accumulatedLength - (pathLengths[i] * 0.2)) / totalPathLength) * 100;
+                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.2)) / totalPolylineLength) * 100;
               } else {
                   // If southwards, position closer to the start
-                  offsetPercentage = ((accumulatedLength - (pathLengths[i] * 0.6)) / totalPathLength) * 100;
+                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.6)) / totalPolylineLength) * 100;
               }
   
               icons.push({
@@ -736,30 +736,30 @@ export default function filamentGoogleMapsWidget({
           }
       }
   
-          /* // Calculate total path length and individual segment lengths
-          for (let i = 0; i < groupedPathInfo.locations.length - 1; i++) {
-              const start = groupedPathInfo.locations[i];
-              const end = groupedPathInfo.locations[i + 1];
+          /* // Calculate total polyline length and individual segment lengths
+          for (let i = 0; i < groupedPolylineInfo.locations.length - 1; i++) {
+              const start = groupedPolylineInfo.locations[i];
+              const end = groupedPolylineInfo.locations[i + 1];
               const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
                   new google.maps.LatLng(start.lat, start.lng),
                   new google.maps.LatLng(end.lat, end.lng)
               );
-              pathLengths.push(segmentLength);
-              totalPathLength += segmentLength;
+              polylineLengths.push(segmentLength);
+              totalPolylineLength += segmentLength;
           }
   
           let accumulatedLength = 0;
-          for (let i = 0; i < pathLengths.length; i++) {
+          for (let i = 0; i < polylineLengths.length; i++) {
               let offsetPercentage;
-              accumulatedLength += pathLengths[i];
+              accumulatedLength += polylineLengths[i];
   
               // Calculate the offset based on the symbolPos value
-              if (groupedPathInfo.symbolPos === 'start') {
-                  offsetPercentage = ((accumulatedLength - (pathLengths[i] / 1.2)) / totalPathLength) * 100;
-              } else if (groupedPathInfo.symbolPos === 'end') {
-                  offsetPercentage = ((accumulatedLength - (pathLengths[i] * 0.1)) / totalPathLength) * 100;
+              if (groupedPolylineInfo.symbolPos === 'start') {
+                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] / 1.2)) / totalPolylineLength) * 100;
+              } else if (groupedPolylineInfo.symbolPos === 'end') {
+                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.1)) / totalPolylineLength) * 100;
               } else { // Default to 'center'
-                  offsetPercentage = ((accumulatedLength - (pathLengths[i] / 2)) / totalPathLength) * 100;
+                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] / 2)) / totalPolylineLength) * 100;
               }
   
               icons.push({
@@ -769,31 +769,31 @@ export default function filamentGoogleMapsWidget({
           } 
       }*/
 
-      console.log("Icons for ",groupedPathInfo.symbolPos,": ", icons);
+      console.log("Icons for ",groupedPolylineInfo.symbolPos,": ", icons);
   
-      // Create the Polyline object for a single grouped path.
-      const path = new google.maps.Polyline({
-          path: groupedPathInfo.locations,
+      // Create the Polyline object for a single grouped polyline.
+      const polyline = new google.maps.Polyline({
+          path: groupedPolylineInfo.locations,
           geodesic: true,
-          strokeColor: groupedPathInfo.color, // Use the color specified in groupedPathInfo
-          strokeOpacity: groupedPathInfo.opacity,
-          strokeWeight: groupedPathInfo.weight,
+          strokeColor: groupedPolylineInfo.color, // Use the color specified in groupedPolylineInfo
+          strokeOpacity: groupedPolylineInfo.opacity,
+          strokeWeight: groupedPolylineInfo.weight,
           icons: icons,
       });
 
-      path.addListener('click', (event) => {
-          console.log('Path clicked:', groupedPathInfo.group);
+      polyline.addListener('click', (event) => {
+          console.log('Polyline clicked:', groupedPolylineInfo.group);
 
           this.infoWindow.setOptions({
               disableAutoPan: false
           });
           this.infoWindow.close();
-          this.infoWindow.setContent(groupedPathInfo.label);
+          this.infoWindow.setContent(groupedPolylineInfo.label);
 
           this.infoWindow.setPosition(event.latLng);
           this.infoWindow.open({
               map: this.map,
-              anchor: path,
+              anchor: polyline,
               shouldFocus: false
           });
 
@@ -804,141 +804,141 @@ export default function filamentGoogleMapsWidget({
           });
       });
 
-      path.group = groupedPathInfo.group;
+      polyline.group = groupedPolylineInfo.group;
   
-      return path;
+      return polyline;
     },
-    createPaths: function() {
-      console.log("Creating paths");
-      if (!this.config.drawPaths) {
-          console.log("drawPaths is disabled.");
-          return; // Exit if drawPaths is disabled
+    createPolylines: function() {
+      console.log("Creating polylines");
+      if (!this.config.drawPolylines) {
+          console.log("drawPolylines is disabled.");
+          return; // Exit if drawPolylines is disabled
       }
 
-      const groupedByPath = this.groupDataByPath();
+      const groupedByPolyline = this.groupDataByPolyline();
 
   
-      /* const groupedByPath = {};
+      /* const groupedByPolyline = {};
   
       this.data.forEach(location => {
-          let pathGroup;
+          let polylineGroup;
           
-          // Check if the path object exists
-          if (location.path) {
-              if (location.path.hasOwnProperty('group')) {
+          // Check if the polyline object exists
+          if (location.polyline) {
+              if (location.polyline.hasOwnProperty('group')) {
                   // Use the group property if it exists
-                  pathGroup = location.path.group;
+                  polylineGroup = location.polyline.group;
               } else {
                 // Use a single default group for all locations
-                pathGroup = "default_group";
+                polylineGroup = "default_group";
               }
               
   
-              // Initialize the group in groupedByPath if not already done
-              if (!groupedByPath[pathGroup]) {
-                  groupedByPath[pathGroup] = {
+              // Initialize the group in groupedByPolyline if not already done
+              if (!groupedByPolyline[polylineGroup]) {
+                  groupedByPolyline[polylineGroup] = {
                       locations: [],
                       color: location.color || '#FF0000', // Default color fallback
-                      opacity: location.path.opacity || 1.0,
-                      weight: location.path.weight || 2,
-                      symbol: location.path.symbol || null,
-                      symbolPos: location.path.symbolPos || 'center',
+                      opacity: location.polyline.opacity || 1.0,
+                      weight: location.polyline.weight || 2,
+                      symbol: location.polyline.symbol || null,
+                      symbolPos: location.polyline.symbolPos || 'center',
                   };
               }
   
               // Add location to the appropriate group
-              groupedByPath[pathGroup].locations.push({
+              groupedByPolyline[polylineGroup].locations.push({
                   lat: parseFloat(location.location.lat),
                   lng: parseFloat(location.location.lng),
-                  order: location.path.order || 0, // Default order, if applicable
+                  order: location.polyline.order || 0, // Default order, if applicable
               });
           }
       });
-      console.log("Final groupedByPath:", groupedByPath);
+      console.log("Final groupedByPolyline:", groupedByPolyline);
   
-      // Sort locations within each path group by pathOrder if applicable
-      Object.values(groupedByPath).forEach(pathInfo => {
-          if (pathInfo.locations.some(loc => loc.order !== 0)) {
-              pathInfo.locations.sort((a, b) => a.order - b.order);
+      // Sort locations within each polyline group by polylineOrder if applicable
+      Object.values(groupedByPolyline).forEach(polylineInfo => {
+          if (polylineInfo.locations.some(loc => loc.order !== 0)) {
+              polylineInfo.locations.sort((a, b) => a.order - b.order);
           }
       }); */
   
-      // Clear existing paths from the map before adding new ones
-      this.paths.forEach(path => path.setMap(null));
-      this.paths = [];
+      // Clear existing polylines from the map before adding new ones
+      this.polylines.forEach(polyline => polyline.setMap(null));
+      this.polylines = [];
       console.log("Before creating polyline for grou yuup");
   
-      // Create and set a path for each path group
-      Object.values(groupedByPath).forEach(pathInfo => {
-        console.log("Creating polyline for group:", pathInfo);
-          const path = this.createPath(pathInfo);
-          path.setMap(this.map);
-          this.paths.push(path); // Store the path for potential future use or modifications
+      // Create and set a polyline for each polyline group
+      Object.values(groupedByPolyline).forEach(polylineInfo => {
+        console.log("Creating polyline for group:", polylineInfo);
+          const polyline = this.createPolyline(polylineInfo);
+          polyline.setMap(this.map);
+          this.polylines.push(polyline); // Store the polyline for potential future use or modifications
       });
 
-      // Add a listener to control path visibility based on zoom level
+      // Add a listener to control polyline visibility based on zoom level
 
       /* this.map.addListener("zoom_changed", () => {
-        console.log("When zooming, we have these paths: ", this.paths);
+        console.log("When zooming, we have these polylines: ", this.polylines);
 
           const zoom = this.map.getZoom();
-          Alpine.raw(this.paths).forEach(path => {
-              console.log("This map get zoom: ", this.map.getZoom(), " for path: ", path);
-              path.setMap(zoom > 13 ? this.map : null);  // Adjust this value as necessary
+          Alpine.raw(this.polylines).forEach(polyline => {
+              console.log("This map get zoom: ", this.map.getZoom(), " for polyline: ", polyline);
+              polyline.setMap(zoom > 13 ? this.map : null);  // Adjust this value as necessary
           });
       }); */
 
-      // Initially set paths on the map based on the starting zoom level
+      // Initially set polylines on the map based on the starting zoom level
       const initialZoom = this.map.getZoom();
-      /* Alpine.raw(this.paths).forEach(path => {
-        console.log("Initial zoom after creating paths: ", initialZoom, " for path: ", path);
-          path.setMap(initialZoom > 13 ? this.map : null);
+      /* Alpine.raw(this.polylines).forEach(polyline => {
+        console.log("Initial zoom after creating polylines: ", initialZoom, " for polyline: ", polyline);
+          polyline.setMap(initialZoom > 13 ? this.map : null);
       });  */
     },
-    /* createPaths: function() {
-      console.log("creating paths");
-      if (!this.config.drawPaths) {
-          console.log("drawPaths is disabled.");
-          return; // Exit the function early if drawPaths is false
+    /* createPolylines: function() {
+      console.log("creating polylines");
+      if (!this.config.drawPolylines) {
+          console.log("drawPolylines is disabled.");
+          return; // Exit the function early if drawPolylines is false
       }
   
-      const groupedByPath = {};
+      const groupedByPolyline = {};
 
 
-      // Define a symbol using a predefined path (an arrow)
+      // Define a symbol using a predefined polyline (an arrow)
       // supplied by the Google Maps JavaScript API.
       const lineSymbol = {
-        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+        path: google.maps.SymbolPolyline.FORWARD_CLOSED_ARROW,
       };
   
-      // Group markers by pathGroup and sort by pathOrder if present
+      // Group markers by polylineGroup and sort by polylineOrder if present
       this.data.forEach(location => {
-          const pathGroup = location.pathGroup;
-          if (!groupedByPath[pathGroup]) {
-              groupedByPath[pathGroup] = {
+          const polylineGroup = location.polylineGroup;
+          if (!groupedByPolyline[polylineGroup]) {
+              groupedByPolyline[polylineGroup] = {
                   locations: [],
                   color: location.color || '#FF0000', // Use the specified color or a fallback
-                  opacity: location.pathOpacity || 1.0,
-                  weight: location.pathWeight || 2,
+                  opacity: location.polylineOpacity || 1.0,
+                  weight: location.polylineWeight || 2,
               };
           }
-          groupedByPath[pathGroup].locations.push({
+          groupedByPolyline[polylineGroup].locations.push({
               lat: parseFloat(location.location.lat),
               lng: parseFloat(location.location.lng),
-              order: location.pathOrder || 0 // Use 0 or another default for non-ordered items
+              order: location.polylineOrder || 0 // Use 0 or another default for non-ordered items
           });
       });
   
-      // Sort locations within each path group by pathOrder if applicable
-      Object.values(groupedByPath).forEach(pathInfo => {
-          if (pathInfo.locations.some(loc => loc.order !== 0)) {
-              pathInfo.locations.sort((a, b) => a.order - b.order);
+      // Sort locations within each polyline group by polylineOrder if applicable
+      Object.values(groupedByPolyline).forEach(polylineInfo => {
+          if (polylineInfo.locations.some(loc => loc.order !== 0)) {
+              polylineInfo.locations.sort((a, b) => a.order - b.order);
           }
       });
   
-      // Draw a path for each path group
-      Object.entries(groupedByPath).forEach(([pathGroup, {locations, color, opacity, weight}]) => {
-          const path = new google.maps.Polyline({
+      // Draw a polyline for each polyline group
+      Object.entries(groupedByPolyline).forEach(([polylineGroup, {locations, color, opacity, weight}]) => {
+          const polyline = new google.maps.Polyline({
               path: locations,
               geodesic: true,
               strokeColor: color, // Dynamically assigned color, with fallback if not specified
@@ -952,7 +952,7 @@ export default function filamentGoogleMapsWidget({
               ],
           });
   
-          path.setMap(this.map);
+          polyline.setMap(this.map);
       });
     }, */
     /* mergeMarkers: async function() {
@@ -1018,84 +1018,84 @@ export default function filamentGoogleMapsWidget({
       this.fitToBounds();
       console.log("Merge complete, current markers: ", this.markers);  // Log final state of markers
     }, */
-    groupDataByPath: function() {
-      console.log("Grouping data by path");
-      const groupedByPath = {};
+    groupDataByPolyline: function() {
+      console.log("Grouping data by polyline");
+      const groupedByPolyline = {};
     
       this.data.forEach(location => {
-          let pathGroup;
+          let polylineGroup;
     
-          // Check if the path object exists
-          if (location.path) {
-              if (location.path.hasOwnProperty('group')) {
+          // Check if the polyline object exists
+          if (location.polyline) {
+              if (location.polyline.hasOwnProperty('group')) {
                   // Use the group property if it exists
-                  pathGroup = location.path.group;
+                  polylineGroup = location.polyline.group;
               } else {
                   // Use a single default group for all locations
-                  pathGroup = "default_group";
+                  polylineGroup = "default_group";
               }
     
-              // Initialize the group in groupedByPath if not already done
-              if (!groupedByPath[pathGroup]) {
-                  groupedByPath[pathGroup] = {
+              // Initialize the group in groupedByPolyline if not already done
+              if (!groupedByPolyline[polylineGroup]) {
+                  groupedByPolyline[polylineGroup] = {
                       locations: [],
-                      group: pathGroup,
-                      label: location.path.label || pathGroup,
+                      group: polylineGroup,
+                      label: location.polyline.label || polylineGroup,
                       color: location.color || '#FF0000', // Default color fallback
-                      opacity: location.path.opacity || 1.0,
-                      weight: location.path.weight || 2,
-                      symbol: location.path.symbol || null,
-                      symbolPos: location.path.symbolPos || 'center',
+                      opacity: location.polyline.opacity || 1.0,
+                      weight: location.polyline.weight || 2,
+                      symbol: location.polyline.symbol || null,
+                      symbolPos: location.polyline.symbolPos || 'center',
                   };
               }
     
               // Add location to the appropriate group
-              groupedByPath[pathGroup].locations.push({
+              groupedByPolyline[polylineGroup].locations.push({
                   lat: parseFloat(location.location.lat),
                   lng: parseFloat(location.location.lng),
-                  order: location.path.order || 0, // Default order, if applicable
+                  order: location.polyline.order || 0, // Default order, if applicable
               });
           }
       });
     
-      // Sort locations within each path group by order, if applicable
-      Object.values(groupedByPath).forEach(pathInfo => {
-          if (pathInfo.locations.some(loc => loc.order !== 0)) {
-              pathInfo.locations.sort((a, b) => a.order - b.order);
+      // Sort locations within each polyline group by order, if applicable
+      Object.values(groupedByPolyline).forEach(polylineInfo => {
+          if (polylineInfo.locations.some(loc => loc.order !== 0)) {
+              polylineInfo.locations.sort((a, b) => a.order - b.order);
           }
       });
     
-      console.log("Data grouped by path:", groupedByPath);
-      return groupedByPath;
+      console.log("Data grouped by polyline:", groupedByPolyline);
+      return groupedByPolyline;
     },
-    hasPathChanged: function(oldPath, newPathInfo) {
+    hasPolylineChanged: function(oldPolyline, newPolylineInfo) {
 
-      /* console.log('oldPath: ', oldPath);
-      console.log('newPathInfo: ', newPathInfo); */
+      /* console.log('oldPolyline: ', oldPolyline);
+      console.log('newPolylineInfo: ', newPolylineInfo); */
       // Compare basic attributes like color, opacity, and weight
-      if (oldPath.strokeColor !== newPathInfo.strokeColor ||
-          oldPath.strokeOpacity !== newPathInfo.strokeOpacity ||
-          oldPath.strokeWeight !== newPathInfo.strokeWeight) {
-            console.log('path comparison 1 true');
+      if (oldPolyline.strokeColor !== newPolylineInfo.strokeColor ||
+          oldPolyline.strokeOpacity !== newPolylineInfo.strokeOpacity ||
+          oldPolyline.strokeWeight !== newPolylineInfo.strokeWeight) {
+            console.log('polyline comparison 1 true');
             return true;
       }
 
-      /* console.log('old path coordinates: ', oldPath.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() })));
-      console.log('new path coordinates: ', newPathInfo.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }))); */
+      /* console.log('old polyline coordinates: ', oldPolyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() })));
+      console.log('new polyline coordinates: ', newPolylineInfo.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }))); */
     
-      // Compare path locations
-      const oldPathCoords = oldPath.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
-      const newPathCoords = newPathInfo.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+      // Compare polyline locations
+      const oldPolylineCoords = oldPolyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+      const newPolylineCoords = newPolylineInfo.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
     
       // Check if number of coordinates or any coordinate has changed
-      if (oldPathCoords.length !== newPathCoords.length) {
-        console.log('path comparison 2 true')
+      if (oldPolylineCoords.length !== newPolylineCoords.length) {
+        console.log('polyline comparison 2 true')
           return true;
       }
     
-      for (let i = 0; i < oldPathCoords.length; i++) {
-          if (oldPathCoords[i].lat !== newPathCoords[i].lat || oldPathCoords[i].lng !== newPathCoords[i].lng) {
-            console.log('path comparison 3 true')
+      for (let i = 0; i < oldPolylineCoords.length; i++) {
+          if (oldPolylineCoords[i].lat !== newPolylineCoords[i].lat || oldPolylineCoords[i].lng !== newPolylineCoords[i].lng) {
+            console.log('polyline comparison 3 true')
               return true;
           }
       }
@@ -1103,73 +1103,73 @@ export default function filamentGoogleMapsWidget({
       // If all checks are the same, return false
       return false;
     },
-    mergePaths: function() {
-      console.log("Starting to merge paths based on current data, current paths: ", this.paths);
+    mergePolylines: function() {
+      console.log("Starting to merge polylines based on current data, current polylines: ", this.polylines);
     
-      // Temporary storage for updated paths
-      const updatedPaths = [];
+      // Temporary storage for updated polylines
+      const updatedPolylines = [];
     
-      // Group new data by path group just like in createPaths
-      const newGroupedByPath = this.groupDataByPath();
+      // Group new data by polyline group just like in createPolylines
+      const newGroupedByPolyline = this.groupDataByPolyline();
       //const currentZoom = this.map.getZoom();  // Get current zoom level
     
-      // Check existing paths and update or keep them based on new grouped data
-      Alpine.raw(this.paths).forEach(path => {
-        console.log('Existing path: ', path);
-        const groupInfo = newGroupedByPath[path.group];
-        console.log('Existing paths groupInfo: ', groupInfo);
+      // Check existing polylines and update or keep them based on new grouped data
+      Alpine.raw(this.polylines).forEach(polyline => {
+        console.log('Existing polyline: ', polyline);
+        const groupInfo = newGroupedByPolyline[polyline.group];
+        console.log('Existing polylines groupInfo: ', groupInfo);
         if (groupInfo) {
-          // If path still exists, check for changes and update if necessary
-          const newPath = this.createPath(groupInfo);
-          console.log('New path: ', newPath);
+          // If polyline still exists, check for changes and update if necessary
+          const newPolyline = this.createPolyline(groupInfo);
+          console.log('New polyline: ', newPolyline);
           
-          if (this.hasPathChanged(path, newPath)) {
-            console.log("Updating path for group: ", groupInfo);
-            path.setPath(newPath.getPath());
-            path.setOptions({
+          if (this.hasPolylineChanged(polyline, newPolyline)) {
+            console.log("Updating polyline for group: ", groupInfo);
+            polyline.setPolyline(newPolyline.getPath());
+            polyline.setOptions({
               strokeColor: groupInfo.color,
               strokeOpacity: groupInfo.opacity,
               strokeWeight: groupInfo.weight,
-              icons: newPath.icons // Assumes icons setup is recalculated in createPath
+              icons: newPolyline.icons // Assumes icons setup is recalculated in createPolyline
             });
           }
 
-          updatedPaths.push(path);
-          delete newGroupedByPath[path.group];
+          updatedPolylines.push(polyline);
+          delete newGroupedByPolyline[polyline.group];
         } else {
-          console.log("Removing path as group no longer exist: ", groupInfo);
-          // If path group no longer exists, remove path
-          path.setMap(null);
+          console.log("Removing polyline as group no longer exist: ", groupInfo);
+          // If polyline group no longer exists, remove polyline
+          polyline.setMap(null);
         }
-        /* // Ensure visibility is correctly set for each existing path
-        path.setMap(currentZoom > 13 ? this.map : null); */
+        /* // Ensure visibility is correctly set for each existing polyline
+        polyline.setMap(currentZoom > 13 ? this.map : null); */
       });
 
-      // Add new paths for groups that didn't have a corresponding existing path
-      for (const groupId in newGroupedByPath) {
-          console.log("Creating new path for group:", newGroupedByPath[groupId]);
-          const newPath = this.createPath(newGroupedByPath[groupId]);
-          newPath.setMap(this.map);
-          updatedPaths.push(newPath);
+      // Add new polylines for groups that didn't have a corresponding existing polyline
+      for (const groupId in newGroupedByPolyline) {
+          console.log("Creating new polyline for group:", newGroupedByPolyline[groupId]);
+          const newPolyline = this.createPolyline(newGroupedByPolyline[groupId]);
+          newPolyline.setMap(this.map);
+          updatedPolylines.push(newPolyline);
       }
   
-      // Update the main paths array with the new or updated paths
-      this.paths = updatedPaths;
-      console.log("Paths merge complete, current paths: ", this.paths);
+      // Update the main polylines array with the new or updated polylines
+      this.polylines = updatedPolylines;
+      console.log("Polylines merge complete, current polylines: ", this.polylines);
     
-      /* // Add new paths for new groups
-      Object.keys(newGroupedByPath).forEach(groupId => {
-        if (!updatedPaths.some(path => path.groupId === groupId)) {
-          console.log("Creating new path for group:", newGroupedByPath[groupId]);
-          const newPath = this.createPath(newGroupedByPath[groupId]);
-          newPath.setMap(this.map);
-          updatedPaths.push(newPath);
+      /* // Add new polylines for new groups
+      Object.keys(newGroupedByPolyline).forEach(groupId => {
+        if (!updatedPolylines.some(polyline => polyline.groupId === groupId)) {
+          console.log("Creating new polyline for group:", newGroupedByPolyline[groupId]);
+          const newPolyline = this.createPolyline(newGroupedByPolyline[groupId]);
+          newPolyline.setMap(this.map);
+          updatedPolylines.push(newPolyline);
         } 
       });*/
     
-      // Update the main paths array with the new or updated paths
-      this.paths = updatedPaths;
-      console.log("Paths merge complete, current paths: ", this.paths);
+      // Update the main polylines array with the new or updated polylines
+      this.polylines = updatedPolylines;
+      console.log("Polylines merge complete, current polylines: ", this.polylines);
     },
     fitToBounds: function (force = false) {
       if (
@@ -1205,7 +1205,7 @@ export default function filamentGoogleMapsWidget({
         this.clusterer.clearMarkers(true);
 
         /* function removeLine() {
-          flightPath.setMap(null);
+          flightPolyline.setMap(null);
         } */
         //this.createMarkers();
 
@@ -1283,12 +1283,12 @@ export default function filamentGoogleMapsWidget({
       //console.log("Markers after mergeMarkers: ", this.markers);
       //console.log("Map after mergeMarkers: ", Alpine.raw(this.map));
       //this.createMarkers();
-      //this.createPaths()
-      this.mergePaths();
+      //this.createPolylines()
+      this.mergePolylines();
       this.updateClustering();
       //this.show();
       /* await this.mergeMarkers();
-      this.updatePaths();
+      this.updatePolylines();
       this.updateClustering();
       this.show(); */
     },

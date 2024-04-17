@@ -34,7 +34,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?bool $clustering = true;
 
     protected static ?bool $fitToBounds = true;
-    protected static ?bool $drawPaths = false;
+    protected static ?bool $drawPolylines = false;
 
     protected static ?int $zoom = null;
 
@@ -63,18 +63,18 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     ];
 
     protected array $mapConfig = [
-        'draggable' => false,
-        'center'    => [
+        'draggable'     => false,
+        'center'        => [
             'lat' => 15.3419776,
             'lng' => 44.2171392,
         ],
-        'zoom'       => 8,
-        'fit'        => true,
-        'gmaps'      => '',
-        'clustering' => true,
-        'drawPaths'  => false,
-        'mapId'      => 'DEMO_MAP_ID',
-        'mapConfig'  => [],
+        'zoom'          => 8,
+        'fit'           => true,
+        'gmaps'         => '',
+        'clustering'    => true,
+        'drawPolylines' => false,
+        'mapId'         => 'DEMO_MAP_ID',
+        'mapConfig'     => [],
     ];
 
     public function mount()
@@ -141,9 +141,9 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
         return static::$fitToBounds;
     }
 
-    protected function getDrawPaths(): ?bool
+    protected function getDrawPolylines(): ?bool
     {
-        return static::$drawPaths;
+        return static::$drawPolylines;
     }
 
     protected function getShouldUpdateMap(): ?bool
@@ -175,7 +175,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     {
         return [
             'clustering'   => self::getClustering(),
-            'drawPaths'    => $this->getDrawPaths(),
+            'drawPolylines'=> $this->getDrawPolylines(),
             'layers'       => $this->getLayers(),
             'zoom'         => $this->getZoom(),
             'controls'     => $this->controls,
