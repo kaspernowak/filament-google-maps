@@ -34,6 +34,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?bool $clustering = true;
 
     protected static ?bool $fitToBounds = true;
+    protected static ?bool $drawPaths = false;
 
     protected static ?int $zoom = null;
 
@@ -44,8 +45,10 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?string $markerAction = null;
 
     protected static ?string $icon = 'heroicon-o-map';
+    protected static ?bool $shouldUpdateMap = false;
 
     protected static bool $collapsible = false;
+    protected ?bool $initialized = false;
 
     protected static string $view = 'filament-google-maps::widgets.filament-google-maps-widget';
 
@@ -69,13 +72,18 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
         'fit'        => true,
         'gmaps'      => '',
         'clustering' => true,
+        'drawPaths'  => false,
+        'mapId'      => 'DEMO_MAP_ID',
         'mapConfig'  => [],
-        'drawPaths'  => true,
     ];
 
     public function mount()
     {
-        $this->dataChecksum = md5('{}');
+        \Log::info('Mounting Map Widget');
+
+        $this->dataChecksum = $this->generateDataChecksum();
+        \Log::info("data Checksum on mount: {$this->dataChecksum}");
+        $this->initialized = true;
     }
 
     protected function generateDataChecksum(): string
@@ -133,6 +141,16 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
         return static::$fitToBounds;
     }
 
+    protected function getDrawPaths(): ?bool
+    {
+        return static::$drawPaths;
+    }
+
+    protected function getShouldUpdateMap(): ?bool
+    {
+        return static::$shouldUpdateMap;
+    }
+
     protected function getLayers(): array
     {
         return static::$layers;
@@ -157,6 +175,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     {
         return [
             'clustering'   => self::getClustering(),
+            'drawPaths'    => $this->getDrawPaths(),
             'layers'       => $this->getLayers(),
             'zoom'         => $this->getZoom(),
             'controls'     => $this->controls,
@@ -188,17 +207,17 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
 
     public function updateMapData()
     {
+        if (!$this->initialized) {
+            return;
+        }
+        
         $newDataChecksum = $this->generateDataChecksum();
-        \Log::info('Update Table', ['newDataChecksum' => $newDataChecksum ,'dataChecksum' => $this->dataChecksum]);
+
         if ($newDataChecksum !== $this->dataChecksum) {
             $this->dataChecksum = $newDataChecksum;
+            \Log::info('checksum changed, updating map');
 
-            \Log::info('Dispatching updateMapData');
-
-
-            $this->dispatch('updateMapData', [
-                'data' => $this->getCachedData(),
-            ])->self();
+            $this->dispatch('updateMap', data: $this->getCachedData());
         }
     }
 
