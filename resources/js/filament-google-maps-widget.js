@@ -82,7 +82,6 @@ export default function filamentGoogleMapsWidget({
         mapId: this.config.mapId,
         ...this.config.controls,
         ...this.config.mapConfig,
-        mapTypeId: 'satellite',
       }); 
 
       this.center = this.config.center;
