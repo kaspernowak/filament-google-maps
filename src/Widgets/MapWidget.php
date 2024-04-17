@@ -79,10 +79,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
 
     public function mount()
     {
-        \Log::info('Mounting Map Widget');
-
         $this->dataChecksum = $this->generateDataChecksum();
-        \Log::info("data Checksum on mount: {$this->dataChecksum}");
         $this->initialized = true;
     }
 
@@ -207,15 +204,10 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
 
     public function updateMapData()
     {
-        if (!$this->initialized) {
-            return;
-        }
-        
         $newDataChecksum = $this->generateDataChecksum();
 
         if ($newDataChecksum !== $this->dataChecksum) {
             $this->dataChecksum = $newDataChecksum;
-            \Log::info('checksum changed, updating map');
 
             $this->dispatch('updateMap', data: $this->getCachedData());
         }
