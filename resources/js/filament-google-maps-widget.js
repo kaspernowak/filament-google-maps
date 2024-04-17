@@ -88,38 +88,9 @@ export default function filamentGoogleMapsWidget({
 
       await this.createMarkers();
 
+      this.createClustering();  
+
       this.createPolylines();
-
-      this.createClustering();
-
-      google.maps.event.addListener(this.clusterer, 'clusteringend', () => {    
-        if (!this.config.drawPolylines || this.polylines.length === 0) {
-            return;
-        }
-        
-        Alpine.raw(this.polylines).forEach((polyline, index) => {
-            const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
-            let polylineShouldBeVisible = true;
-    
-            for (const cluster of this.clusterer.clusters) {
-                if (cluster.count > 1) { 
-                    const markers = Alpine.raw(cluster.markers);
-                    const isAnyMarkerOnPolyline = markers.some(marker => 
-                        polylineCoords.some(polylineCoord => 
-                            polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
-                        )
-                    );
-    
-                    if (isAnyMarkerOnPolyline) {
-                        polylineShouldBeVisible = false;
-                        break; 
-                    }
-                }
-            }
-
-            polyline.setMap(polylineShouldBeVisible ? this.map : null); // Apply visibility setting
-        });
-      });   
 
       this.createLayers();
 
@@ -280,16 +251,23 @@ export default function filamentGoogleMapsWidget({
     },
     createMarkers: async function () {    
       const markerPromises = this.data.map((location, index) => {
-          return this.createMarker(location).then(marker => {
-            return marker;
-          });
+        return this.createMarker(location).then(marker => {
+          return marker;
+        });
       });
+      /* const markerPromises = this.data.flatMap((location) => {
+        const markers = [this.createMarker(location)];
+        if (location.origin) {
+            markers.push(this.createMarker(location.origin));
+        }
+        return markers;
+      }); */
   
       const markers = await Promise.all(markerPromises);
       this.markers = markers;
   
       markers.forEach((marker, index) => {
-          marker.setMap(Alpine.raw(this.map));
+          marker.map = (Alpine.raw(this.map));
   
           if (this.config.markerAction) {
               google.maps.event.addListener(marker, "click", () => {
@@ -446,10 +424,35 @@ export default function filamentGoogleMapsWidget({
 
       Object.values(groupedByPolyline).forEach(polylineInfo => {
           const polyline = this.createPolyline(polylineInfo);
-          polyline.setMap(this.map);
+          polyline.setMap(Alpine.raw(this.map));
           this.polylines.push(polyline);
       });
-      const initialZoom = this.map.getZoom();
+
+      google.maps.event.addListener(this.clusterer, 'clusteringend', () => {  
+        if (!this.config.drawPolylines || this.polylines.length === 0) {
+            return;
+        }
+        Alpine.raw(this.polylines).forEach((polyline, index) => {
+            const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+            let polylineShouldBeVisible = true;
+    
+            for (const cluster of this.clusterer.clusters) {
+                if (cluster.count > 1) { 
+                    const markers = Alpine.raw(cluster.markers);
+                    const isAnyMarkerOnPolyline = markers.some(marker => 
+                        polylineCoords.some(polylineCoord => 
+                            polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
+                        )
+                    );
+                    if (isAnyMarkerOnPolyline) {
+                        polylineShouldBeVisible = false;
+                        break; 
+                    }
+                }
+            }
+            polyline.setMap(polylineShouldBeVisible ? Alpine.raw(this.map) : null); // Apply visibility setting
+        });
+      }); 
     },
     groupDataByPolyline: function() {
       const groupedByPolyline = {};
@@ -637,7 +640,7 @@ export default function filamentGoogleMapsWidget({
       await this.mergeMarkers();
       this.mergePolylines();
       this.updateClustering();
-      //this.show();
+      this.show();
     },
     recenter: function (data) {
       this.map.panTo({ lat: data.lat, lng: data.lng });
