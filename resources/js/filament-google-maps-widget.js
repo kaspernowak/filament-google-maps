@@ -157,7 +157,7 @@ export default function filamentGoogleMapsWidget({
       }
 
       function createPinOptions({ scale = 1, glyph = null, glyphColor = "#ff8300", background = "#FFD514", borderColor = "#ff8300"}) {
-        const pinScale = typeof scale === 'number' ? scale : 1; // Ensure scale is a number
+        const pinScale = typeof scale === 'number' ? scale : 1;
         return {
           scale: pinScale,
           glyph,
@@ -247,7 +247,7 @@ export default function filamentGoogleMapsWidget({
       return marker;
     },
     createMarkers: async function () { 
-      const originCoords = new Set(); // Store coordinates of origin markers
+      const originCoords = new Set();
   
       const markerPromises = this.data.flatMap((location) => {
         const markers = [this.createMarker(location)];
@@ -263,15 +263,24 @@ export default function filamentGoogleMapsWidget({
   
       const markers = await Promise.all(markerPromises);
       this.markers = markers;
-
-      function handleInfowindow(marker) {
+      
+      markers.forEach((marker, index) => {
+        marker.map = Alpine.raw(this.map);
+        this.createMarkerListener(marker);
+      });
+    },
+    createMarkerListener: function(marker) {
+      const handleInfowindow = (marker) => {
         if (this.infoWindow.isOpen && this.infoWindow.anchor === marker) {
-          this.infoWindow.close();
-          this.infoWindow.isOpen = false;
+            console.log('Window is already open on this marker, closing it.');
+            this.infoWindow.close();
+            this.infoWindow.isOpen = false;
         } else {
           if (this.infoWindow.isOpen) {
+            console.log('Window is open on another marker, closing it.');
             this.infoWindow.close();
           }
+          console.log('Opening window with new content.');
           this.infoWindow.setOptions({
             disableAutoPan: false
           });
@@ -279,34 +288,22 @@ export default function filamentGoogleMapsWidget({
           this.infoWindow.open(this.map, marker);
           this.infoWindow.isOpen = true;
         }
-        google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
-          this.infoWindow.setOptions({
-            disableAutoPan: true
+      };
+  
+      if (this.config.markerAction && marker.model_id !== 0) {
+        marker.addListener("click", () => {
+          if (this.infoWindow.isOpen) {
+            this.infoWindow.close();
+            this.infoWindow.isOpen = false;
+          }
+          console.log('Executing action for record marker:', marker.model_id);
+          this.$wire.mountAction(this.config.markerAction, {
+            model_id: marker.model_id,
           });
         });
+      } else {
+        marker.addListener("click", () => handleInfowindow(marker));
       }
-      
-      markers.forEach((marker, index) => {
-        marker.map = Alpine.raw(this.map);
-    
-        if (this.config.markerAction) {
-          marker.addListener("click", () => {
-            if (marker.model_id === 0) {
-              handleInfowindow.call(this, marker);
-            } else {
-              if (this.infoWindow.isOpen) {
-                this.infoWindow.close();
-                this.infoWindow.isOpen = false;
-              }
-              this.$wire.mountAction(this.config.markerAction, {
-                model_id: marker.model_id,
-              });
-            }
-          });
-        } else {
-          marker.addListener("click", () => handleInfowindow.call(this, marker));
-        }
-      });
     },
     removeMarker: function (marker) {
       marker.map = null;
@@ -344,6 +341,7 @@ export default function filamentGoogleMapsWidget({
           updatedMarkers.push(marker);
         }
       }
+
       const newLocations = this.data.filter(loc =>
         !updatedMarkers.some(marker => 
           marker.position.lat === loc.location.lat && marker.position.lng === loc.location.lng
@@ -352,37 +350,17 @@ export default function filamentGoogleMapsWidget({
     
       for (const location of newLocations) {
         const newMarker = await this.createMarker(location);
-        if (this.config.markerAction) {
-          newMarker.addListener("click", () => {
-            this.$wire.mountAction(this.config.markerAction, {
-              model_id: newMarker.model_id,
-            });
-          });
-        } else {
-          newMarker.addListener("click", () => {
-            if (this.infoWindow.isOpen && this.infoWindow.anchor === newMarker) {
-              this.infoWindow.close();
-              this.infoWindow.isOpen = false;
-            } else {
-              if (this.infoWindow.isOpen) {
-                this.infoWindow.close();
-              }
-              this.infoWindow.setOptions({
-                disableAutoPan: false
-              });
-              this.infoWindow.setContent(newMarker.info);
-              this.infoWindow.open(this.map, newMarker);
-              this.infoWindow.isOpen = true;
-            }
-            google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
-              this.infoWindow.setOptions({
-                disableAutoPan: true
-              });
-            });
-          });
-        }
-        newMarker.setMap(Alpine.raw(this.map));
+        this.createMarkerListener(newMarker);
+        newMarker.map = Alpine.raw(this.map);
         updatedMarkers.push(newMarker);
+
+        if (location.origin && !updatedMarkers.some(marker =>
+            marker.position.lat === location.origin.location.lat && marker.position.lng === location.origin.location.lng)) {
+            const originMarker = await this.createMarker(location.origin);
+            this.createMarkerListener(originMarker);
+            originMarker.setMap(Alpine.raw(this.map));
+            updatedMarkers.push(originMarker);
+        }
       }
     
       this.markers = updatedMarkers;
@@ -503,7 +481,7 @@ export default function filamentGoogleMapsWidget({
                   }
                 }
               }
-              polyline.setMap(polylineShouldBeVisible ? Alpine.raw(this.map) : null); // Apply visibility setting
+              polyline.setMap(polylineShouldBeVisible ? Alpine.raw(this.map) : null);
           });
         });
       } 
