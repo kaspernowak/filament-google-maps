@@ -242,6 +242,7 @@ export default function filamentGoogleMapsWidget({
       });
 
       marker.model_id = location.id;
+      marker.info = location.info;
 
       if (this.modelIds.indexOf(location.id) === -1) {
         this.modelIds.push(location.id);
@@ -275,10 +276,18 @@ export default function filamentGoogleMapsWidget({
             if (this.infoWindow.isOpen) {
                 this.infoWindow.close();
             }
-            this.infoWindow.setContent(marker.title);
+            this.infoWindow.setOptions({
+                disableAutoPan: false
+            });
+            this.infoWindow.setContent(marker.info);
             this.infoWindow.open(this.map, marker);
             this.infoWindow.isOpen = true;
         }
+        google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
+            this.infoWindow.setOptions({
+                disableAutoPan: true
+            });
+        });
       }
       
       markers.forEach((marker, index) => {
@@ -362,10 +371,18 @@ export default function filamentGoogleMapsWidget({
                 if (this.infoWindow.isOpen) {
                     this.infoWindow.close();
                 }
-                this.infoWindow.setContent(newMarker.title);
+                this.infoWindow.setOptions({
+                    disableAutoPan: false
+                });
+                this.infoWindow.setContent(newMarker.info);
                 this.infoWindow.open(this.map, newMarker);
                 this.infoWindow.isOpen = true;
             }
+            google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
+                this.infoWindow.setOptions({
+                    disableAutoPan: true
+                });
+            });
           });
         }
         newMarker.setMap(Alpine.raw(this.map));
