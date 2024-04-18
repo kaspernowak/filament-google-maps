@@ -467,7 +467,7 @@ export default function filamentGoogleMapsWidget({
           this.polylines.push(polyline);
       });
 
-      if(this.clustering) {
+      if(this.config.clustering) {
         google.maps.event.addListener(this.clusterer, 'clusteringend', () => {  
           if (!this.config.drawPolylines || this.polylines.length === 0) {
               return;
@@ -592,9 +592,9 @@ export default function filamentGoogleMapsWidget({
       });
 
       for (const groupId in newGroupedByPolyline) {
-          const newPolyline = this.createPolyline(newGroupedByPolyline[groupId]);
-          newPolyline.setMap(this.map);
-          updatedPolylines.push(newPolyline);
+        const newPolyline = this.createPolyline(newGroupedByPolyline[groupId]);
+        newPolyline.setMap(!this.config.clustering ? this.map : null);
+        updatedPolylines.push(newPolyline);
       }
     
       this.polylines = updatedPolylines;
