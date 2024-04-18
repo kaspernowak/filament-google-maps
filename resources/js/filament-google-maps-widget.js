@@ -231,6 +231,8 @@ export default function filamentGoogleMapsWidget({
       return contentElement
     },    
     createMarker: async function (location) {
+      console.log('Creating marker for location: ', location);
+      console.log('We have these markers currently: ', this.markers);
       const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
       const content = await this.createMarkerContent(location);
@@ -249,19 +251,20 @@ export default function filamentGoogleMapsWidget({
 
       return marker;
     },
-    createMarkers: async function () {    
-      const markerPromises = this.data.map((location, index) => {
-        return this.createMarker(location).then(marker => {
-          return marker;
-        });
-      });
-      /* const markerPromises = this.data.flatMap((location) => {
+    createMarkers: async function () { 
+      const originCoords = new Set(); // Store coordinates of origin markers
+  
+      const markerPromises = this.data.flatMap((location) => {
         const markers = [this.createMarker(location)];
         if (location.origin) {
-            markers.push(this.createMarker(location.origin));
+            const coordKey = `${location.lat},${location.lng}`;
+            if (!originCoords.has(coordKey)) {
+                originCoords.add(coordKey);
+                markers.push(this.createMarker(location.origin));
+            }
         }
         return markers;
-      }); */
+      });
   
       const markers = await Promise.all(markerPromises);
       this.markers = markers;
@@ -459,6 +462,8 @@ export default function filamentGoogleMapsWidget({
     
       this.data.forEach(location => {
           let polylineGroup;
+
+          console.log("Processing location:", location);
     
           if (location.polyline) {
               if (location.polyline.hasOwnProperty('group')) {
@@ -467,7 +472,10 @@ export default function filamentGoogleMapsWidget({
                   polylineGroup = "default_group";
               }
 
+              console.log(`Detected polyline group: ${polylineGroup}`);
+
               if (!groupedByPolyline[polylineGroup]) {
+                console.log(`Creating new group: ${polylineGroup}`);
                   groupedByPolyline[polylineGroup] = {
                       locations: [],
                       group: polylineGroup,
@@ -476,8 +484,15 @@ export default function filamentGoogleMapsWidget({
                       opacity: location.polyline.opacity || 1.0,
                       weight: location.polyline.weight || 2,
                       symbol: location.polyline.symbol || null,
-                      symbolPos: location.polyline.symbolPos || 'center',
                   };
+
+                  if (location.origin) {
+                      groupedByPolyline[polylineGroup].locations.push({
+                          lat: parseFloat(location.origin.location.lat),
+                          lng: parseFloat(location.origin.location.lng),
+                          order: -Infinity 
+                      });
+                  }
               }
     
               groupedByPolyline[polylineGroup].locations.push({
@@ -485,8 +500,12 @@ export default function filamentGoogleMapsWidget({
                   lng: parseFloat(location.location.lng),
                   order: location.polyline.order || 0,
               });
+
+              console.log(`Added location to group ${polylineGroup}:`, location);
           }
       });
+
+      console.log("Final groups:", groupedByPolyline);
     
       Object.values(groupedByPolyline).forEach(polylineInfo => {
           if (polylineInfo.locations.some(loc => loc.order !== 0)) {
