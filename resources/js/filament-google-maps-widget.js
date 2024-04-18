@@ -68,7 +68,7 @@ export default function filamentGoogleMapsWidget({
     callWire: function (thing) {},
     createMap: async function () {      
       if (!window.google || !window.google.maps) {
-          await this.loadGMaps();
+        await this.loadGMaps();
       }
 
       this.infoWindow = new google.maps.InfoWindow({
@@ -176,65 +176,61 @@ export default function filamentGoogleMapsWidget({
       }
 
       if (location.icon && typeof location.icon === "object") {
-          if (location.icon.hasOwnProperty("url")) {
-            const imageElement = createImageElement(location.icon.url, location.icon.type, location.icon.scale);
-            if(location.icon.hasOwnProperty("glyph") && location.icon.glyph) {
-              pinOptions = createPinOptions({ glyph: imageElement });
-            } else {
-              content = imageElement
-            }
-          } else if (location.icon.hasOwnProperty("svg")) {
-              const svgElement = createSvgElement(location.icon.svg, location.icon.scale);
-              if(location.icon.glyph) {
-                pinOptions = createPinOptions({ glyph: svgElement });
-              } else {
-                content = svgElement
-              }
-          } else if (location.icon.hasOwnProperty("html")) {
-              content = document.createElement('div');
-              content.innerHTML = location.icon.html;
-              content = content.firstChild;
-          } else if (location.icon.hasOwnProperty("text")) {
-              content = document.createElement('div');
-              if (location.icon.class) content.className = location.icon.class;
-              content.textContent = location.icon.text;
-              if (location.hasOwnProperty("color")) {
-                Object.assign(content.style, {
-                  background: location.color,
-                  borderTopColor: location.color,
-                  color: 'white',
-                  padding: '5px',
-                  borderRadius: '5px',
-                  textAlign: 'center',
-                  width: '60px'
-                });
-                //content.classList.add("after:content-[''] after:absolute after:left-1/2 after:top-full after:-translate-x-1/2 after:translate-y-0 after:w-0 after:h-0 after:border-solid after:border-l-8 after:border-r-8 after:border-t-8 after:border-l-transparent after:border-r-transparent after:border-t-inherit")
-              }
-          } else if (location.icon.hasOwnProperty("icon")) {
-              const iconContainer = createIconContainer(location.icon.icon);
-              pinOptions = createPinOptions({ glyph: iconContainer, scale: location.icon.scale });
-          } else if (location.icon.hasOwnProperty("glyphColor") || location.icon.hasOwnProperty("borderColor") || location.icon.type === "pin" ) {
-            const pinScale = typeof location.icon.scale === 'number' ? location.icon.scale : 1;
-            pinOptions = createPinOptions({
-              scale: pinScale,
-              glyphColor: location.icon.glyphColor,
-              background: location.color, 
-              borderColor: location.icon.borderColor 
-          });
+        if (location.icon.hasOwnProperty("url")) {
+          const imageElement = createImageElement(location.icon.url, location.icon.type, location.icon.scale);
+          if(location.icon.hasOwnProperty("glyph") && location.icon.glyph) {
+            pinOptions = createPinOptions({ glyph: imageElement });
+          } else {
+            content = imageElement
           }
+        } else if (location.icon.hasOwnProperty("svg")) {
+          const svgElement = createSvgElement(location.icon.svg, location.icon.scale);
+          if(location.icon.glyph) {
+            pinOptions = createPinOptions({ glyph: svgElement });
+          } else {
+            content = svgElement
+          }
+        } else if (location.icon.hasOwnProperty("html")) {
+          content = document.createElement('div');
+          content.innerHTML = location.icon.html;
+          content = content.firstChild;
+        } else if (location.icon.hasOwnProperty("text")) {
+          content = document.createElement('div');
+          if (location.icon.class) content.className = location.icon.class;
+          content.textContent = location.icon.text;
+          if (location.hasOwnProperty("color")) {
+            Object.assign(content.style, {
+              background: location.color,
+              borderTopColor: location.color,
+              color: 'white',
+              padding: '5px',
+              borderRadius: '5px',
+              textAlign: 'center',
+              width: '60px'
+            });
+            //content.classList.add("after:content-[''] after:absolute after:left-1/2 after:top-full after:-translate-x-1/2 after:translate-y-0 after:w-0 after:h-0 after:border-solid after:border-l-8 after:border-r-8 after:border-t-8 after:border-l-transparent after:border-r-transparent after:border-t-inherit")
+          }
+        } else if (location.icon.hasOwnProperty("icon")) {
+          const iconContainer = createIconContainer(location.icon.icon);
+          pinOptions = createPinOptions({ glyph: iconContainer, scale: location.icon.scale });
+        } else if (location.icon.hasOwnProperty("glyphColor") || location.icon.hasOwnProperty("borderColor") || location.icon.type === "pin" ) {
+          const pinScale = typeof location.icon.scale === 'number' ? location.icon.scale : 1;
+          pinOptions = createPinOptions({
+            scale: pinScale,
+            glyphColor: location.icon.glyphColor,
+            background: location.color, 
+            borderColor: location.icon.borderColor 
+          });
+        }
       }
   
       const pin = Object.keys(pinOptions).length > 0 ? new PinElement(pinOptions) : undefined;
-
       const contentElement = content || (pin ? pin.element : null)
-
       return contentElement
     },    
     createMarker: async function (location) {
       const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
       const content = await this.createMarkerContent(location);
-
       const marker = new AdvancedMarkerElement({
         position: location.location,
         content: content,
@@ -256,11 +252,11 @@ export default function filamentGoogleMapsWidget({
       const markerPromises = this.data.flatMap((location) => {
         const markers = [this.createMarker(location)];
         if (location.origin) {
-            const coordKey = `${location.origin.location.lat},${location.origin.location.lng}`;
-            if (!originCoords.has(coordKey)) {
-                originCoords.add(coordKey);
-                markers.push(this.createMarker(location.origin));
-            }
+          const coordKey = `${location.origin.location.lat},${location.origin.location.lng}`;
+          if (!originCoords.has(coordKey)) {
+            originCoords.add(coordKey);
+            markers.push(this.createMarker(location.origin));
+          }
         }
         return markers;
       });
@@ -270,46 +266,46 @@ export default function filamentGoogleMapsWidget({
 
       function handleInfowindow(marker) {
         if (this.infoWindow.isOpen && this.infoWindow.anchor === marker) {
-            this.infoWindow.close();
-            this.infoWindow.isOpen = false;
+          this.infoWindow.close();
+          this.infoWindow.isOpen = false;
         } else {
-            if (this.infoWindow.isOpen) {
-                this.infoWindow.close();
-            }
-            this.infoWindow.setOptions({
-                disableAutoPan: false
-            });
-            this.infoWindow.setContent(marker.info);
-            this.infoWindow.open(this.map, marker);
-            this.infoWindow.isOpen = true;
+          if (this.infoWindow.isOpen) {
+            this.infoWindow.close();
+          }
+          this.infoWindow.setOptions({
+            disableAutoPan: false
+          });
+          this.infoWindow.setContent(marker.info);
+          this.infoWindow.open(this.map, marker);
+          this.infoWindow.isOpen = true;
         }
         google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
-            this.infoWindow.setOptions({
-                disableAutoPan: true
-            });
+          this.infoWindow.setOptions({
+            disableAutoPan: true
+          });
         });
       }
       
       markers.forEach((marker, index) => {
-          marker.map = Alpine.raw(this.map);
-      
-          if (this.config.markerAction) {
-              marker.addListener("click", () => {
-                  if (marker.model_id === 0) {
-                      handleInfowindow.call(this, marker);
-                  } else {
-                      if (this.infoWindow.isOpen) {
-                          this.infoWindow.close();
-                          this.infoWindow.isOpen = false;
-                      }
-                      this.$wire.mountAction(this.config.markerAction, {
-                          model_id: marker.model_id,
-                      });
-                  }
+        marker.map = Alpine.raw(this.map);
+    
+        if (this.config.markerAction) {
+          marker.addListener("click", () => {
+            if (marker.model_id === 0) {
+              handleInfowindow.call(this, marker);
+            } else {
+              if (this.infoWindow.isOpen) {
+                this.infoWindow.close();
+                this.infoWindow.isOpen = false;
+              }
+              this.$wire.mountAction(this.config.markerAction, {
+                model_id: marker.model_id,
               });
-          } else {
-              marker.addListener("click", () => handleInfowindow.call(this, marker));
-          }
+            }
+          });
+        } else {
+          marker.addListener("click", () => handleInfowindow.call(this, marker));
+        }
       });
     },
     removeMarker: function (marker) {
@@ -358,30 +354,30 @@ export default function filamentGoogleMapsWidget({
         const newMarker = await this.createMarker(location);
         if (this.config.markerAction) {
           newMarker.addListener("click", () => {
-              this.$wire.mountAction(this.config.markerAction, {
-                model_id: newMarker.model_id,
-              });
+            this.$wire.mountAction(this.config.markerAction, {
+              model_id: newMarker.model_id,
+            });
           });
         } else {
           newMarker.addListener("click", () => {
             if (this.infoWindow.isOpen && this.infoWindow.anchor === newMarker) {
-                this.infoWindow.close();
-                this.infoWindow.isOpen = false;
+              this.infoWindow.close();
+              this.infoWindow.isOpen = false;
             } else {
-                if (this.infoWindow.isOpen) {
-                    this.infoWindow.close();
-                }
-                this.infoWindow.setOptions({
-                    disableAutoPan: false
-                });
-                this.infoWindow.setContent(newMarker.info);
-                this.infoWindow.open(this.map, newMarker);
-                this.infoWindow.isOpen = true;
+              if (this.infoWindow.isOpen) {
+                this.infoWindow.close();
+              }
+              this.infoWindow.setOptions({
+                disableAutoPan: false
+              });
+              this.infoWindow.setContent(newMarker.info);
+              this.infoWindow.open(this.map, newMarker);
+              this.infoWindow.isOpen = true;
             }
             google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
-                this.infoWindow.setOptions({
-                    disableAutoPan: true
-                });
+              this.infoWindow.setOptions({
+                disableAutoPan: true
+              });
             });
           });
         }
@@ -404,65 +400,65 @@ export default function filamentGoogleMapsWidget({
           const polylineLengths = [];
 
           for (let i = 0; i < groupedPolylineInfo.locations.length - 1; i++) {
-              const start = groupedPolylineInfo.locations[i];
-              const end = groupedPolylineInfo.locations[i + 1];
-              const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
-                  new google.maps.LatLng(start.lat, start.lng),
-                  new google.maps.LatLng(end.lat, end.lng)
-              );
-              polylineLengths.push(segmentLength);
-              totalPolylineLength += segmentLength;
+            const start = groupedPolylineInfo.locations[i];
+            const end = groupedPolylineInfo.locations[i + 1];
+            const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
+              new google.maps.LatLng(start.lat, start.lng),
+              new google.maps.LatLng(end.lat, end.lng)
+            );
+            polylineLengths.push(segmentLength);
+            totalPolylineLength += segmentLength;
           }
   
           let accumulatedLength = 0;
           for (let i = 0; i < polylineLengths.length; i++) {
-              const start = groupedPolylineInfo.locations[i];
-              const end = groupedPolylineInfo.locations[i + 1];
-              accumulatedLength += polylineLengths[i];
-  
-              const isNorthwards = end.lat > start.lat;
-              let offsetPercentage;
-              if (isNorthwards) {
-                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.2)) / totalPolylineLength) * 100;
-              } else {
-                  offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.6)) / totalPolylineLength) * 100;
-              }
-  
-              icons.push({
-                  icon: lineSymbol,
-                  offset: `${offsetPercentage}%`,
-              });
+            const start = groupedPolylineInfo.locations[i];
+            const end = groupedPolylineInfo.locations[i + 1];
+            accumulatedLength += polylineLengths[i];
+
+            const isNorthwards = end.lat > start.lat;
+            let offsetPercentage;
+            if (isNorthwards) {
+              offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.2)) / totalPolylineLength) * 100;
+            } else {
+              offsetPercentage = ((accumulatedLength - (polylineLengths[i] * 0.6)) / totalPolylineLength) * 100;
+            }
+
+            icons.push({
+              icon: lineSymbol,
+              offset: `${offsetPercentage}%`,
+            });
           }
       }
 
       const polyline = new google.maps.Polyline({
-          path: groupedPolylineInfo.locations,
-          geodesic: true,
-          strokeColor: groupedPolylineInfo.color,
-          strokeOpacity: groupedPolylineInfo.opacity,
-          strokeWeight: groupedPolylineInfo.weight,
-          icons: icons,
+        path: groupedPolylineInfo.locations,
+        geodesic: true,
+        strokeColor: groupedPolylineInfo.color,
+        strokeOpacity: groupedPolylineInfo.opacity,
+        strokeWeight: groupedPolylineInfo.weight,
+        icons: icons,
       });
 
       polyline.addListener('click', (event) => {
+        this.infoWindow.setOptions({
+          disableAutoPan: false
+        });
+        this.infoWindow.close();
+        this.infoWindow.setContent(groupedPolylineInfo.label);
+
+        this.infoWindow.setPosition(event.latLng);
+        this.infoWindow.open({
+          map: this.map,
+          anchor: polyline,
+          shouldFocus: false
+        });
+
+        google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
           this.infoWindow.setOptions({
-              disableAutoPan: false
+            disableAutoPan: true
           });
-          this.infoWindow.close();
-          this.infoWindow.setContent(groupedPolylineInfo.label);
-
-          this.infoWindow.setPosition(event.latLng);
-          this.infoWindow.open({
-              map: this.map,
-              anchor: polyline,
-              shouldFocus: false
-          });
-
-          google.maps.event.addListenerOnce(this.infoWindow, 'domready', () => {
-              this.infoWindow.setOptions({
-                  disableAutoPan: true
-              });
-          });
+        });
       });
 
       polyline.group = groupedPolylineInfo.group;
@@ -471,7 +467,7 @@ export default function filamentGoogleMapsWidget({
     },
     createPolylines: function() {
       if (!this.config.drawPolylines) {
-          return;
+        return;
       }
 
       const groupedByPolyline = this.groupDataByPolyline();
@@ -479,33 +475,33 @@ export default function filamentGoogleMapsWidget({
       this.polylines = [];
 
       Object.values(groupedByPolyline).forEach(polylineInfo => {
-          const polyline = this.createPolyline(polylineInfo);
-          polyline.setMap(Alpine.raw(this.map));
-          this.polylines.push(polyline);
+        const polyline = this.createPolyline(polylineInfo);
+        polyline.setMap(Alpine.raw(this.map));
+        this.polylines.push(polyline);
       });
 
       if(this.config.clustering) {
         google.maps.event.addListener(this.clusterer, 'clusteringend', () => {  
           if (!this.config.drawPolylines || this.polylines.length === 0) {
-              return;
+            return;
           }
           Alpine.raw(this.polylines).forEach((polyline, index) => {
               const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
               let polylineShouldBeVisible = true;
       
               for (const cluster of this.clusterer.clusters) {
-                  if (cluster.count > 1) { 
-                      const markers = Alpine.raw(cluster.markers);
-                      const isAnyMarkerOnPolyline = markers.some(marker => 
-                          polylineCoords.some(polylineCoord => 
-                              polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
-                          )
-                      );
-                      if (isAnyMarkerOnPolyline) {
-                          polylineShouldBeVisible = false;
-                          break; 
-                      }
+                if (cluster.count > 1) { 
+                  const markers = Alpine.raw(cluster.markers);
+                  const isAnyMarkerOnPolyline = markers.some(marker => 
+                    polylineCoords.some(polylineCoord => 
+                        polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
+                    )
+                  );
+                  if (isAnyMarkerOnPolyline) {
+                    polylineShouldBeVisible = false;
+                    break; 
                   }
+                }
               }
               polyline.setMap(polylineShouldBeVisible ? Alpine.raw(this.map) : null); // Apply visibility setting
           });
@@ -519,43 +515,43 @@ export default function filamentGoogleMapsWidget({
           let polylineGroup;
     
           if (location.polyline) {
-              if (location.polyline.hasOwnProperty('group')) {
-                  polylineGroup = location.polyline.group;
-              } else {
-                  polylineGroup = "default_group";
-              }
+            if (location.polyline.hasOwnProperty('group')) {
+              polylineGroup = location.polyline.group;
+            } else {
+              polylineGroup = "default_group";
+            }
 
-              if (!groupedByPolyline[polylineGroup]) {
-                  groupedByPolyline[polylineGroup] = {
-                      locations: [],
-                      group: polylineGroup,
-                      label: location.polyline.label || polylineGroup,
-                      color: location.color || '#FF0000',
-                      opacity: location.polyline.opacity || 1.0,
-                      weight: location.polyline.weight || 2,
-                      symbol: location.polyline.symbol || null,
-                  };
+            if (!groupedByPolyline[polylineGroup]) {
+              groupedByPolyline[polylineGroup] = {
+                locations: [],
+                group: polylineGroup,
+                label: location.polyline.label || polylineGroup,
+                color: location.color || '#FF0000',
+                opacity: location.polyline.opacity || 1.0,
+                weight: location.polyline.weight || 2,
+                symbol: location.polyline.symbol || null,
+              };
 
-                  if (location.origin) {
-                      groupedByPolyline[polylineGroup].locations.push({
-                          lat: parseFloat(location.origin.location.lat),
-                          lng: parseFloat(location.origin.location.lng),
-                          order: -Infinity 
-                      });
-                  }
+              if (location.origin) {
+                groupedByPolyline[polylineGroup].locations.push({
+                  lat: parseFloat(location.origin.location.lat),
+                  lng: parseFloat(location.origin.location.lng),
+                  order: -Infinity 
+                });
               }
-    
-              groupedByPolyline[polylineGroup].locations.push({
-                  lat: parseFloat(location.location.lat),
-                  lng: parseFloat(location.location.lng),
-                  order: location.polyline.order || 0,
-              });
+            }
+  
+            groupedByPolyline[polylineGroup].locations.push({
+              lat: parseFloat(location.location.lat),
+              lng: parseFloat(location.location.lng),
+              order: location.polyline.order || 0,
+            });
           }
       });
     
       Object.values(groupedByPolyline).forEach(polylineInfo => {
           if (polylineInfo.locations.some(loc => loc.order !== 0)) {
-              polylineInfo.locations.sort((a, b) => a.order - b.order);
+            polylineInfo.locations.sort((a, b) => a.order - b.order);
           }
       });
     
@@ -565,19 +561,19 @@ export default function filamentGoogleMapsWidget({
       if (oldPolyline.strokeColor !== newPolylineInfo.strokeColor ||
           oldPolyline.strokeOpacity !== newPolylineInfo.strokeOpacity ||
           oldPolyline.strokeWeight !== newPolylineInfo.strokeWeight) {
-            return true;
+        return true;
       }
       const oldPolylineCoords = oldPolyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
       const newPolylineCoords = newPolylineInfo.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
     
       if (oldPolylineCoords.length !== newPolylineCoords.length) {
-          return true;
+        return true;
       }
     
       for (let i = 0; i < oldPolylineCoords.length; i++) {
-          if (oldPolylineCoords[i].lat !== newPolylineCoords[i].lat || oldPolylineCoords[i].lng !== newPolylineCoords[i].lng) {
-              return true;
-          }
+        if (oldPolylineCoords[i].lat !== newPolylineCoords[i].lat || oldPolylineCoords[i].lng !== newPolylineCoords[i].lng) {
+          return true;
+        }
       }
 
       return false;
