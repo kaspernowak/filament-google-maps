@@ -231,8 +231,6 @@ export default function filamentGoogleMapsWidget({
       return contentElement
     },    
     createMarker: async function (location) {
-      console.log('Creating marker for location: ', location);
-      console.log('We have these markers currently: ', this.markers);
       const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
       const content = await this.createMarkerContent(location);
@@ -257,7 +255,7 @@ export default function filamentGoogleMapsWidget({
       const markerPromises = this.data.flatMap((location) => {
         const markers = [this.createMarker(location)];
         if (location.origin) {
-            const coordKey = `${location.lat},${location.lng}`;
+            const coordKey = `${location.origin.location.lat},${location.origin.location.lng}`;
             if (!originCoords.has(coordKey)) {
                 originCoords.add(coordKey);
                 markers.push(this.createMarker(location.origin));
@@ -268,16 +266,40 @@ export default function filamentGoogleMapsWidget({
   
       const markers = await Promise.all(markerPromises);
       this.markers = markers;
-  
+
+      function handleInfowindow(marker) {
+        if (this.infoWindow.isOpen && this.infoWindow.anchor === marker) {
+            this.infoWindow.close();
+            this.infoWindow.isOpen = false;
+        } else {
+            if (this.infoWindow.isOpen) {
+                this.infoWindow.close();
+            }
+            this.infoWindow.setContent(marker.title);
+            this.infoWindow.open(this.map, marker);
+            this.infoWindow.isOpen = true;
+        }
+      }
+      
       markers.forEach((marker, index) => {
-          marker.map = (Alpine.raw(this.map));
-  
+          marker.map = Alpine.raw(this.map);
+      
           if (this.config.markerAction) {
-              google.maps.event.addListener(marker, "click", () => {
-                  this.$wire.mountAction(this.config.markerAction, {
-                      model_id: marker.model_id,
-                  });
+              marker.addListener("click", () => {
+                  if (marker.model_id === 0) {
+                      handleInfowindow.call(this, marker);
+                  } else {
+                      if (this.infoWindow.isOpen) {
+                          this.infoWindow.close();
+                          this.infoWindow.isOpen = false;
+                      }
+                      this.$wire.mountAction(this.config.markerAction, {
+                          model_id: marker.model_id,
+                      });
+                  }
               });
+          } else {
+              marker.addListener("click", () => handleInfowindow.call(this, marker));
           }
       });
     },
@@ -295,9 +317,14 @@ export default function filamentGoogleMapsWidget({
       const updatedMarkers = [];
     
       for (const marker of this.markers) {
-        const location = this.data.find(loc => 
-          loc.location.lat === marker.position.lat && loc.location.lng === marker.position.lng
+        let location = this.data.find(loc => 
+          (loc.location.lat === marker.position.lat && loc.location.lng === marker.position.lng) ||
+          (loc.origin?.location.lat === marker.position.lat && loc.origin?.location.lng === marker.position.lng)
         );
+
+        if (location?.origin?.location.lat === marker.position.lat && location.origin.location.lng === marker.position.lng) {
+          location = location.origin;
+        }
     
         if (location) {
           const content = await this.createMarkerContent(location);
@@ -321,15 +348,24 @@ export default function filamentGoogleMapsWidget({
       for (const location of newLocations) {
         const newMarker = await this.createMarker(location);
         if (this.config.markerAction) {
-          google.maps.event.addListener(newMarker, "click", () => {
+          newMarker.addListener("click", () => {
               this.$wire.mountAction(this.config.markerAction, {
                 model_id: newMarker.model_id,
               });
           });
         } else {
           newMarker.addListener("click", () => {
-            this.infoWindow.setContent(location.label);
-            this.infoWindow.open(this.map, newMarker);
+            if (this.infoWindow.isOpen && this.infoWindow.anchor === newMarker) {
+                this.infoWindow.close();
+                this.infoWindow.isOpen = false;
+            } else {
+                if (this.infoWindow.isOpen) {
+                    this.infoWindow.close();
+                }
+                this.infoWindow.setContent(newMarker.title);
+                this.infoWindow.open(this.map, newMarker);
+                this.infoWindow.isOpen = true;
+            }
           });
         }
         newMarker.setMap(Alpine.raw(this.map));
@@ -431,39 +467,39 @@ export default function filamentGoogleMapsWidget({
           this.polylines.push(polyline);
       });
 
-      google.maps.event.addListener(this.clusterer, 'clusteringend', () => {  
-        if (!this.config.drawPolylines || this.polylines.length === 0) {
-            return;
-        }
-        Alpine.raw(this.polylines).forEach((polyline, index) => {
-            const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
-            let polylineShouldBeVisible = true;
-    
-            for (const cluster of this.clusterer.clusters) {
-                if (cluster.count > 1) { 
-                    const markers = Alpine.raw(cluster.markers);
-                    const isAnyMarkerOnPolyline = markers.some(marker => 
-                        polylineCoords.some(polylineCoord => 
-                            polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
-                        )
-                    );
-                    if (isAnyMarkerOnPolyline) {
-                        polylineShouldBeVisible = false;
-                        break; 
-                    }
-                }
-            }
-            polyline.setMap(polylineShouldBeVisible ? Alpine.raw(this.map) : null); // Apply visibility setting
+      if(this.clustering) {
+        google.maps.event.addListener(this.clusterer, 'clusteringend', () => {  
+          if (!this.config.drawPolylines || this.polylines.length === 0) {
+              return;
+          }
+          Alpine.raw(this.polylines).forEach((polyline, index) => {
+              const polylineCoords = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+              let polylineShouldBeVisible = true;
+      
+              for (const cluster of this.clusterer.clusters) {
+                  if (cluster.count > 1) { 
+                      const markers = Alpine.raw(cluster.markers);
+                      const isAnyMarkerOnPolyline = markers.some(marker => 
+                          polylineCoords.some(polylineCoord => 
+                              polylineCoord.lat === marker.position.lat && polylineCoord.lng === marker.position.lng
+                          )
+                      );
+                      if (isAnyMarkerOnPolyline) {
+                          polylineShouldBeVisible = false;
+                          break; 
+                      }
+                  }
+              }
+              polyline.setMap(polylineShouldBeVisible ? Alpine.raw(this.map) : null); // Apply visibility setting
+          });
         });
-      }); 
+      } 
     },
     groupDataByPolyline: function() {
       const groupedByPolyline = {};
     
       this.data.forEach(location => {
           let polylineGroup;
-
-          console.log("Processing location:", location);
     
           if (location.polyline) {
               if (location.polyline.hasOwnProperty('group')) {
@@ -472,10 +508,7 @@ export default function filamentGoogleMapsWidget({
                   polylineGroup = "default_group";
               }
 
-              console.log(`Detected polyline group: ${polylineGroup}`);
-
               if (!groupedByPolyline[polylineGroup]) {
-                console.log(`Creating new group: ${polylineGroup}`);
                   groupedByPolyline[polylineGroup] = {
                       locations: [],
                       group: polylineGroup,
@@ -500,12 +533,8 @@ export default function filamentGoogleMapsWidget({
                   lng: parseFloat(location.location.lng),
                   order: location.polyline.order || 0,
               });
-
-              console.log(`Added location to group ${polylineGroup}:`, location);
           }
       });
-
-      console.log("Final groups:", groupedByPolyline);
     
       Object.values(groupedByPolyline).forEach(polylineInfo => {
           if (polylineInfo.locations.some(loc => loc.order !== 0)) {
