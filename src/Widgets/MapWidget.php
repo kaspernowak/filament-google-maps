@@ -79,10 +79,8 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
 
     public function mount()
     {
-        \Log::info("Mounting map, is initialized?", ['$this->initialized' => $this->initialized] );
         $this->dataChecksum = $this->generateDataChecksum();
         $this->initialized = true;
-        \Log::info("After Mounting map, is initialized?", ['$this->initialized' => $this->initialized] );
     }
 
     protected function generateDataChecksum(): string

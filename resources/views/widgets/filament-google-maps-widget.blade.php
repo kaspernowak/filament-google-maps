@@ -68,10 +68,7 @@
     <x-filament-actions::modals />
 </x-filament-widgets::widget>
 @php
-    \Log::info("checking if we should update map", ['ShouldUpdateMap' => $this->getShouldUpdateMap()] );
-
     if ($this->getShouldUpdateMap()) {
-    \Log::info("updating map");
         $this->updateMapData(); 
     }
 @endphp
