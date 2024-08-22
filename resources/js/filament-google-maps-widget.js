@@ -21,6 +21,7 @@ export default function filamentGoogleMapsWidget({
     center: null,
     isMapDragging: false,
     isIdleSkipped: false,
+    programmaticClose: false,
     config: {
       center: {
         lat: 0,
@@ -96,6 +97,8 @@ export default function filamentGoogleMapsWidget({
 
       this.idle();
 
+      this.addMapClickListener();
+
       window.addEventListener(
         "filament-google-maps::widget/setMapCenter",
         (event) => {
@@ -111,6 +114,36 @@ export default function filamentGoogleMapsWidget({
       );
 
       this.show(true);
+    },
+    addMapClickListener: function() {
+      // Attach click listener directly to the map to close modal when clicking outside
+      google.maps.event.addListener(this.map, "click", (event) => {
+        if (!this.isMapDragging && document.fullscreenElement) {
+          console.log("Map clicked, but not dragging. Checking modal...");
+            
+          const existingClonedModal = document.querySelector('.cloned-modal');
+          const originalModalContainer = document.querySelector('.marker-action-modal');
+
+          // Only proceed if the original modal container exists
+          if (originalModalContainer) {
+              const originalModalCancelButton = originalModalContainer.querySelector('button[x-on\\:click="close()"]');
+
+              /* if (existingClonedModal) {
+                existingClonedModal.remove();
+                console.log('Cloned modal removed after clicking outside.');
+              } */
+
+              if (originalModalCancelButton) {
+                //this.programmaticClose = true; // Set flag
+                originalModalCancelButton.click();
+                //this.programmaticClose = false; // Reset flag
+                console.log('Original modal closed after clicking outside.');
+              }
+          } else {
+              console.log('No original modal container found.');
+          }
+        }
+      });
     },
     show: function (force = false) {
       if (this.markers.length > 0 && this.config.fit) {
@@ -249,6 +282,7 @@ export default function filamentGoogleMapsWidget({
     createMarkers: async function () { 
       const originCoords = new Set();
   
+      console.log('grouporder data: ', this.data);
       const markerPromises = this.data.flatMap((location) => {
         const markers = [this.createMarker(location)];
         if (location.origin) {
@@ -272,9 +306,9 @@ export default function filamentGoogleMapsWidget({
     createMarkerListener: function(marker) {
       const handleInfowindow = (marker) => {
         if (this.infoWindow.isOpen && this.infoWindow.anchor === marker) {
-            console.log('Window is already open on this marker, closing it.');
-            this.infoWindow.close();
-            this.infoWindow.isOpen = false;
+          console.log('Window is already open on this marker, closing it.');
+          this.infoWindow.close();
+          this.infoWindow.isOpen = false;
         } else {
           if (this.infoWindow.isOpen) {
             console.log('Window is open on another marker, closing it.');
@@ -289,17 +323,120 @@ export default function filamentGoogleMapsWidget({
           this.infoWindow.isOpen = true;
         }
       };
-  
+
+      
       if (this.config.markerAction && marker.model_id !== 0) {
         marker.addListener("click", () => {
           if (this.infoWindow.isOpen) {
             this.infoWindow.close();
             this.infoWindow.isOpen = false;
           }
-          console.log('Executing action for record marker:', marker.model_id);
-          this.$wire.mountAction(this.config.markerAction, {
-            model_id: marker.model_id,
-          });
+          //console.log('Executing action for record marker:', marker.model_id, 'at: ', new Date());
+
+          // Ensure any existing cloned modal is removed
+          const originalModalContainer = document.querySelector('.marker-action-modal');
+          if (originalModalContainer) {
+            const originalModalCancelButton = originalModalContainer.querySelector('button[x-on\\:click="close()"]');
+            //existingClonedModal.remove();
+            //this.programmaticClose = true; // Set flag
+            originalModalCancelButton.click();
+            //this.programmaticClose = false; // Reset flag
+            console.log('Previous cloned modal removed.');
+          }
+
+          const loadingMask = document.createElement('div');
+          
+          // Apply Tailwind CSS classes for positioning and styling
+          loadingMask.classList.add(
+            'absolute', 'top-0', 'left-0', 'w-full', 'h-full',
+            'bg-white', 'bg-opacity-80', 'z-50', 'flex', 'items-center', 'justify-center'
+          );
+          
+          // Create the spinner element using Tailwind CSS classes
+          loadingMask.innerHTML = `
+            <div class=" inline-flex items-center">
+              <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          `;
+  
+          this.mapEl.firstElementChild.appendChild(loadingMask);
+
+          /* const existingClonedModal = document.querySelector('.cloned-modal');
+  
+          const delay = !!existingClonedModal ? 500 : 0; */
+          const delay = 500; 
+
+          setTimeout(() => {
+            this.$wire.mountAction(this.config.markerAction, {
+              model_id: marker.model_id,
+            }).then(() => {
+              console.log('Finished mounting action at: ', new Date());
+              if (document.fullscreenElement) {
+
+                // Find the specific modal container using the class
+                const modalContainer = document.querySelector('.marker-action-modal');
+
+                if (modalContainer && document.fullscreenElement) {
+                  //console.log('Specific modal container found:', modalContainer);
+
+                  // Clone the modal container
+                  const clonedModal = modalContainer.cloneNode(true);
+
+                  // Add the 'cloned-modal' class
+                  clonedModal.classList.add('cloned-modal');
+
+                  // Append the cloned modal to the map's inner div (first child)
+                  const childElement = this.mapEl.firstElementChild;
+                  if (childElement) {
+                    childElement.appendChild(clonedModal);
+                    console.log('Cloned modal container appended to map child element.');
+
+                    // Reinitialize Alpine.js on the cloned modal
+                    Alpine.initTree(clonedModal); // Reinitialize Alpine.js
+
+                    // Attach click listener to the "Cancel" button
+                    const cancelButton = clonedModal.querySelector('button[x-on\\:click="close()"]');
+                    const originalCancelButton = modalContainer.querySelector('button[x-on\\:click="close()"]');
+
+                    if (cancelButton ) {
+                      cancelButton.addEventListener('click', (event) => {
+                        //console.log('Cancel button clicked in cloned modal!');
+                        clonedModal.remove();
+                        originalCancelButton.click();
+                        console.log('Cloned modal removed after clicking Cancel.');
+                      });
+                    }
+
+                    // Manually set the `isOpen` property to true if needed
+                    const modalScope = Alpine.$data(clonedModal);
+                    if (modalScope) {
+                      modalScope.isOpen = true;
+                    }
+
+                    // Optionally, add an event listener to remove the clone when exiting fullscreen
+                    document.addEventListener('fullscreenchange', () => {
+                      if (!document.fullscreenElement) {
+                        clonedModal.remove();
+                        console.log('Cloned modal removed on exiting fullscreen.');
+                      }
+                    });
+                  } else {
+                    console.log('Child element not found in mapEl.');
+                  }
+                } else {
+                  console.log('Specific modal container not found.');
+                }
+              } else {
+                //console.log('Not in fullscreen mode, skipping modal handling.');
+              }
+            }).finally(() => {
+              // Remove the loading mask
+              loadingMask.remove();
+            });
+          }, delay);
         });
       } else {
         marker.addListener("click", () => handleInfowindow(marker));
@@ -364,7 +501,7 @@ export default function filamentGoogleMapsWidget({
       }
     
       this.markers = updatedMarkers;
-      this.fitToBounds();
+      //this.fitToBounds();
     },
     createPolyline: function(groupedPolylineInfo) {
       const lineSymbol = {
@@ -661,16 +798,27 @@ export default function filamentGoogleMapsWidget({
         });
         google.maps.event.addListener(this.map, "dragstart", (event) => {
           self.isMapDragging = true;
+          console.log('drag start')
         });
         google.maps.event.addListener(this.map, "dragend", (event) => {
           self.isMapDragging = false;
           if (self.idleSkipped === true) {
             debouncedMoved();
             self.idleSkipped = false;
+            console.log('drag end')
           }
         });
         google.maps.event.addListener(this.map, "bounds_changed", (event) => {
           self.idleSkipped = false;
+        });
+      } else {
+        google.maps.event.addListener(this.map, "dragstart", (event) => {
+          self.isMapDragging = true;
+          console.log('drag start')
+        });
+        google.maps.event.addListener(this.map, "dragend", (event) => {
+          self.isMapDragging = false;
+          console.log('drag end')
         });
       }
     },
@@ -679,7 +827,7 @@ export default function filamentGoogleMapsWidget({
       await this.mergeMarkers();
       this.mergePolylines();
       this.updateClustering();
-      this.show();
+      //this.show();
     },
     recenter: function (data) {
       this.map.panTo({ lat: data.lat, lng: data.lng });
