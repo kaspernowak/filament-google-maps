@@ -77,6 +77,8 @@ export default function filamentGoogleMapsWidget({
         disableAutoPan: true,
       });
 
+      this.infoWindow.set('closed', true);
+
       this.map = new google.maps.Map(this.mapEl, {
         center: this.config.center,
         zoom: this.config.zoom,
@@ -271,7 +273,7 @@ export default function filamentGoogleMapsWidget({
       });
 
       marker.model_id = location.id;
-      marker.info = location.info;
+      marker.info = location.info ?? location.label;
 
       if (this.modelIds.indexOf(location.id) === -1) {
         this.modelIds.push(location.id);
@@ -305,31 +307,29 @@ export default function filamentGoogleMapsWidget({
     },
     createMarkerListener: function(marker) {
       const handleInfowindow = (marker) => {
-        if (this.infoWindow.isOpen && this.infoWindow.anchor === marker) {
-          console.log('Window is already open on this marker, closing it.');
+        if (!this.infoWindow.get('closed') && this.infoWindow.anchor === marker) {
           this.infoWindow.close();
-          this.infoWindow.isOpen = false;
+          this.infoWindow.set('closed', true);
         } else {
-          if (this.infoWindow.isOpen) {
-            console.log('Window is open on another marker, closing it.');
+          if (!this.infoWindow.get('closed')) {
             this.infoWindow.close();
           }
-          console.log('Opening window with new content.');
+          console.log('Opening window with new contentxzm.');
           this.infoWindow.setOptions({
             disableAutoPan: false
           });
           this.infoWindow.setContent(marker.info);
           this.infoWindow.open(this.map, marker);
-          this.infoWindow.isOpen = true;
+          this.infoWindow.set('closed', false);
         }
       };
 
       
       if (this.config.markerAction && marker.model_id !== 0) {
         marker.addListener("click", () => {
-          if (this.infoWindow.isOpen) {
+          if (!this.infoWindow.get('closed')) {
             this.infoWindow.close();
-            this.infoWindow.isOpen = false;
+            this.infoWindow.set('closed', true);
           }
           //console.log('Executing action for record marker:', marker.model_id, 'at: ', new Date());
 
