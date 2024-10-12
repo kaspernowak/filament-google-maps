@@ -283,8 +283,7 @@ export default function filamentGoogleMapsWidget({
     },
     createMarkers: async function () { 
       const originCoords = new Set();
-  
-      console.log('grouporder data: ', this.data);
+      
       const markerPromises = this.data.flatMap((location) => {
         const markers = [this.createMarker(location)];
         if (location.origin) {
