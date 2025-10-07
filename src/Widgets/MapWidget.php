@@ -36,6 +36,8 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?bool $fitToBounds = true;
     protected static ?bool $drawPolylines = false;
 
+    protected static ?float $overlappingMarkerOffset = null;
+
     protected static ?int $zoom = null;
 
     protected static array $layers = [];
@@ -143,6 +145,11 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
         return static::$drawPolylines;
     }
 
+    protected function getOverlappingMarkerOffset(): ?float
+    {
+        return static::$overlappingMarkerOffset;
+    }
+
     protected function getShouldUpdateMap(): ?bool
     {
         return static::$shouldUpdateMap;
@@ -180,6 +187,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
             'markerAction' => $this->getMarkerAction(),
             'gmaps'        => MapsHelper::mapsUrl(),
             'mapConfig'    => [],
+            'overlappingMarkerOffset' => $this->getOverlappingMarkerOffset(),
         ];
     }
 
