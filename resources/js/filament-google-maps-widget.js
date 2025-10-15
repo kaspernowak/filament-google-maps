@@ -63,6 +63,30 @@ export default function filamentGoogleMapsWidget({
           reject(error);
         };
       });
+
+      // When backend signals trip-stops-updated, ensure any open form UI is restored
+      window.addEventListener("trip-stops-updated", () => {
+        if (this.infoWindow && !this.infoWindow.get("closed")) {
+          const scopeEl =
+            document.querySelector(".info-window-content[data-fgm-scope]") ||
+            document.querySelector("[data-fgm-scope]") ||
+            null;
+          const form = scopeEl
+            ? scopeEl.querySelector("[data-fgm-form]")
+            : document.querySelector("[data-fgm-form]");
+          if (!form) return;
+          const btn = form.querySelector("[data-fgm-submit]");
+          const spinner = btn ? btn.querySelector(".fgm-spinner") : null;
+          if (btn) {
+            btn.disabled = false;
+            btn.removeAttribute("aria-busy");
+            btn.classList.remove("opacity-50", "cursor-not-allowed");
+          }
+          if (spinner) {
+            spinner.classList.add("hidden");
+          }
+        }
+      });
     },
     init: async function () {
       this.mapEl = document.getElementById(mapEl) || mapEl;
@@ -113,7 +137,67 @@ export default function filamentGoogleMapsWidget({
       );
 
       window.addEventListener("updateMap", (event) => {
-        this.update(event.detail.data);
+        this.update(
+          event.detail.data,
+          event.detail.openId,
+          event.detail.focusField
+        );
+      });
+
+      // Update InfoWindow inputs to reflect server-authoritative values
+      window.addEventListener("fgm-update-stop-inputs", (event) => {
+        const { id, route_id, sequence, focus } = event.detail || {};
+        if (!id) return;
+        if (this.infoWindow && !this.infoWindow.get("closed")) {
+          const scopeEl =
+            document.querySelector(".info-window-content[data-fgm-scope]") ||
+            document.querySelector("[data-fgm-scope]") ||
+            null;
+          const form = scopeEl
+            ? scopeEl.querySelector("[data-fgm-form]")
+            : document.querySelector("[data-fgm-form]");
+          if (!form) return;
+          const formIdAttr = form.getAttribute("data-id");
+          const formId = formIdAttr ? parseInt(formIdAttr, 10) : null;
+          if (formId !== id) {
+            return;
+          }
+
+          const routeInput = form.querySelector('input[name="route_id"]');
+          const seqInput = form.querySelector('input[name="sequence"]');
+          if (routeInput && route_id !== undefined)
+            routeInput.value = route_id ?? "";
+          if (seqInput && sequence !== undefined)
+            seqInput.value = sequence ?? "";
+
+          // Focus requested field if provided
+          const targetEl =
+            focus === "sequence"
+              ? seqInput
+              : focus === "route_id"
+              ? routeInput
+              : null;
+          if (targetEl && typeof targetEl.focus === "function") {
+            setTimeout(() => {
+              try {
+                targetEl.focus({ preventScroll: true });
+              } catch (_) {
+                targetEl.focus();
+              }
+            }, 0);
+          }
+
+          // Always restore UI state on event, in case a previous submit left it disabled
+          const btn = form.querySelector("[data-fgm-submit]");
+          const spinner = btn ? btn.querySelector(".fgm-spinner") : null;
+          if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("opacity-50", "cursor-not-allowed");
+          }
+          if (spinner) {
+            spinner.classList.add("hidden");
+          }
+        }
       });
 
       this.show(true);
@@ -122,8 +206,6 @@ export default function filamentGoogleMapsWidget({
       // Attach click listener directly to the map to close modal when clicking outside
       google.maps.event.addListener(this.map, "click", (event) => {
         if (!this.isMapDragging && document.fullscreenElement) {
-          console.log("Map clicked, but not dragging. Checking modal...");
-
           const existingClonedModal = document.querySelector(".cloned-modal");
           const originalModalContainer = document.querySelector(
             ".marker-action-modal"
@@ -138,17 +220,14 @@ export default function filamentGoogleMapsWidget({
 
             /* if (existingClonedModal) {
                 existingClonedModal.remove();
-                console.log('Cloned modal removed after clicking outside.');
               } */
 
             if (originalModalCancelButton) {
               //this.programmaticClose = true; // Set flag
               originalModalCancelButton.click();
               //this.programmaticClose = false; // Reset flag
-              console.log("Original modal closed after clicking outside.");
             }
           } else {
-            console.log("No original modal container found.");
           }
         }
       });
@@ -377,9 +456,6 @@ export default function filamentGoogleMapsWidget({
         !google?.maps?.geometry?.spherical?.computeOffset ||
         typeof google.maps.geometry.spherical.computeOffset !== "function"
       ) {
-        console.warn(
-          "Google Maps geometry library is required for overlapping marker offsets."
-        );
         return;
       }
 
@@ -456,7 +532,6 @@ export default function filamentGoogleMapsWidget({
           if (!this.infoWindow.get("closed")) {
             this.infoWindow.close();
           }
-          console.log("Opening window with new contentxzm.");
           this.infoWindow.setOptions({
             disableAutoPan: false,
           });
@@ -485,6 +560,21 @@ export default function filamentGoogleMapsWidget({
               if (!form) {
                 return;
               }
+
+              // Prevent duplicate bindings across re-opens
+              if (form.dataset.fgmBound === "1") {
+                return;
+              }
+              form.dataset.fgmBound = "1";
+              // Track last-focused input inside this form
+              ["route_id", "sequence"].forEach((n) => {
+                const el = form.querySelector(`input[name="${n}"]`);
+                if (el) {
+                  el.addEventListener("focusin", () => {
+                    form.dataset.fgmLastFocus = n;
+                  });
+                }
+              });
 
               const handler = (e) => {
                 e.preventDefault();
@@ -515,26 +605,76 @@ export default function filamentGoogleMapsWidget({
                 });
 
                 if (this.$wire && typeof this.$wire[method] === "function") {
+                  const btn = form.querySelector("[data-fgm-submit]");
+                  const spinner = btn
+                    ? btn.querySelector(".fgm-spinner")
+                    : null;
+                  // Include focus hint (last-focused within form or current active element)
+                  const active = document.activeElement;
+                  let focusHint = form.dataset.fgmLastFocus || null;
+                  if (
+                    !focusHint &&
+                    active &&
+                    form.contains(active) &&
+                    (active.name === "route_id" || active.name === "sequence")
+                  ) {
+                    focusHint = active.name;
+                  }
+                  if (focusHint === "route_id" || focusHint === "sequence") {
+                    payload.focus = focusHint;
+                  }
+                  // Proactively show loading UI
+                  if (btn) {
+                    btn.disabled = true;
+                    btn.setAttribute("aria-busy", "true");
+                    btn.classList.add("opacity-50", "cursor-not-allowed");
+                  }
+                  if (spinner) {
+                    spinner.classList.remove("hidden");
+                  }
+                  // Fail-safe UI restore in case promise never settles
+                  const failSafe = setTimeout(() => {
+                    if (btn) {
+                      btn.disabled = false;
+                      btn.removeAttribute("aria-busy");
+                      btn.classList.remove("opacity-50", "cursor-not-allowed");
+                    }
+                    if (spinner) {
+                      spinner.classList.add("hidden");
+                    }
+                  }, 5000);
+
                   this.$wire[method](payload)
                     .then(() => {
-                      // Close the InfoWindow after successful update
-                      this.infoWindow.close();
-                      this.infoWindow.set("closed", true);
+                      // Do not close; server will refresh map and we will re-open the same marker via openId
                     })
                     .catch(() => {
                       // No-op: allow server-side validation to surface via notifications
+                    })
+                    .finally(() => {
+                      // Always restore UI, even if nothing changed server-side
+                      if (btn) {
+                        btn.disabled = false;
+                        btn.removeAttribute("aria-busy");
+                        btn.classList.remove(
+                          "opacity-50",
+                          "cursor-not-allowed"
+                        );
+                      }
+                      if (spinner) {
+                        spinner.classList.add("hidden");
+                      }
+                      clearTimeout(failSafe);
                     });
                 }
               };
 
               const submitBtn = form.querySelector("[data-fgm-submit]");
               if (submitBtn) {
-                submitBtn.addEventListener("click", handler, { once: true });
+                submitBtn.addEventListener("click", handler);
               }
-              form.addEventListener("submit", handler, { once: true });
-            } catch (err) {
-              console.warn("FGM InfoWindow form binding failed:", err);
-            }
+              form.addEventListener("submit", handler);
+            } catch (err) {}
           });
         }
       };
@@ -560,7 +700,6 @@ export default function filamentGoogleMapsWidget({
             //this.programmaticClose = true; // Set flag
             originalModalCancelButton.click();
             //this.programmaticClose = false; // Reset flag
-            console.log("Previous cloned modal removed.");
           }
 
           const loadingMask = document.createElement("div");
@@ -603,7 +742,6 @@ export default function filamentGoogleMapsWidget({
                 model_id: marker.model_id,
               })
               .then(() => {
-                console.log("Finished mounting action at: ", new Date());
                 if (document.fullscreenElement) {
                   // Find the specific modal container using the class
                   const modalContainer = document.querySelector(
@@ -623,9 +761,6 @@ export default function filamentGoogleMapsWidget({
                     const childElement = this.mapEl.firstElementChild;
                     if (childElement) {
                       childElement.appendChild(clonedModal);
-                      console.log(
-                        "Cloned modal container appended to map child element."
-                      );
 
                       // Reinitialize Alpine.js on the cloned modal
                       Alpine.initTree(clonedModal); // Reinitialize Alpine.js
@@ -643,9 +778,6 @@ export default function filamentGoogleMapsWidget({
                           //console.log('Cancel button clicked in cloned modal!');
                           clonedModal.remove();
                           originalCancelButton.click();
-                          console.log(
-                            "Cloned modal removed after clicking Cancel."
-                          );
                         });
                       }
 
@@ -659,16 +791,11 @@ export default function filamentGoogleMapsWidget({
                       document.addEventListener("fullscreenchange", () => {
                         if (!document.fullscreenElement) {
                           clonedModal.remove();
-                          console.log(
-                            "Cloned modal removed on exiting fullscreen."
-                          );
                         }
                       });
                     } else {
-                      console.log("Child element not found in mapEl.");
                     }
                   } else {
-                    console.log("Specific modal container not found.");
                   }
                 } else {
                   //console.log('Not in fullscreen mode, skipping modal handling.');
@@ -1083,14 +1210,12 @@ export default function filamentGoogleMapsWidget({
         });
         google.maps.event.addListener(this.map, "dragstart", (event) => {
           self.isMapDragging = true;
-          console.log("drag start");
         });
         google.maps.event.addListener(this.map, "dragend", (event) => {
           self.isMapDragging = false;
           if (self.idleSkipped === true) {
             debouncedMoved();
             self.idleSkipped = false;
-            console.log("drag end");
           }
         });
         google.maps.event.addListener(this.map, "bounds_changed", (event) => {
@@ -1099,22 +1224,170 @@ export default function filamentGoogleMapsWidget({
       } else {
         google.maps.event.addListener(this.map, "dragstart", (event) => {
           self.isMapDragging = true;
-          console.log("drag start");
         });
         google.maps.event.addListener(this.map, "dragend", (event) => {
           self.isMapDragging = false;
-          console.log("drag end");
         });
       }
     },
-    update: async function (data) {
-      console.log("update map!");
+    update: async function (data, openId = null, focusField = null) {
       this.data = data;
       this.applyOverlappingOffset();
       await this.mergeMarkers();
       this.mergePolylines();
       this.updateClustering();
       //this.show();
+
+      // Re-open a specific InfoWindow if requested
+      if (openId !== null && openId !== undefined) {
+        const targetId =
+          typeof openId === "string" ? parseInt(openId, 10) : openId;
+        const marker = this.markers.find((m) => m.model_id === targetId);
+        if (marker) {
+          try {
+            if (!this.infoWindow.get("closed")) {
+              this.infoWindow.close();
+            }
+            this.infoWindow.setOptions({ disableAutoPan: false });
+
+            const headerContent = marker?.header ?? marker?.title ?? "";
+            if (typeof this.infoWindow.setHeaderContent === "function") {
+              const headerNode = this.createHeaderContentNode(headerContent);
+              this.infoWindow.setHeaderContent(headerNode);
+            }
+            this.infoWindow.setContent(marker.info);
+            this.infoWindow.open(this.map, marker);
+            this.infoWindow.set("closed", false);
+
+            google.maps.event.addListenerOnce(
+              this.infoWindow,
+              "domready",
+              () => {
+                try {
+                  const scopeEl =
+                    document.querySelector(
+                      ".info-window-content[data-fgm-scope]"
+                    ) ||
+                    document.querySelector("[data-fgm-scope]") ||
+                    null;
+                  const form = scopeEl
+                    ? scopeEl.querySelector("[data-fgm-form]")
+                    : document.querySelector("[data-fgm-form]");
+                  if (!form) return;
+
+                  // Focus desired field on reopen
+                  const routeInput = form.querySelector('input[name="route_id"]');
+                  const seqInput = form.querySelector('input[name="sequence"]');
+                  const targetEl =
+                    focusField === 'sequence'
+                      ? seqInput
+                      : (focusField === 'route_id' ? routeInput : null);
+                  if (targetEl && typeof targetEl.focus === 'function') {
+                    setTimeout(() => {
+                      try {
+                        targetEl.focus({ preventScroll: true });
+                      } catch (_) {
+                        targetEl.focus();
+                      }
+                    }, 0);
+                  }
+
+                  // Prevent duplicate bindings across re-opens
+                  if (form.dataset.fgmBound === "1") {
+                    return;
+                  }
+                  form.dataset.fgmBound = "1";
+
+                  const handler = (e) => {
+                    e.preventDefault();
+                    const method =
+                      form.getAttribute("data-fgm-method") ||
+                      "updateStopFromMap";
+                    const idAttr = form.getAttribute("data-id");
+                    const id = idAttr ? parseInt(idAttr, 10) : null;
+                    const payload = {};
+                    if (id) payload.id = id;
+                    const fields = form.querySelectorAll(
+                      "input[name], select[name], textarea[name]"
+                    );
+                    fields.forEach((el) => {
+                      const name = el.name;
+                      let value = el.value;
+                      if (value === "") return;
+                      if (el.type === "number") {
+                        const parsed = parseInt(value, 10);
+                        if (!Number.isNaN(parsed)) {
+                          value = parsed;
+                        } else {
+                          return;
+                        }
+                      }
+                      payload[name] = value;
+                    });
+
+                    if (
+                      this.$wire &&
+                      typeof this.$wire[method] === "function"
+                    ) {
+                      const btn = form.querySelector("[data-fgm-submit]");
+                      const spinner = btn
+                        ? btn.querySelector(".fgm-spinner")
+                        : null;
+                      const active = document.activeElement;
+                      let focusHint = form.dataset.fgmLastFocus || null;
+                      if (
+                        !focusHint &&
+                        active &&
+                        form.contains(active) &&
+                        (active.name === "route_id" ||
+                          active.name === "sequence")
+                      ) {
+                        focusHint = active.name;
+                      }
+                      if (
+                        focusHint === "route_id" ||
+                        focusHint === "sequence"
+                      ) {
+                        payload.focus = focusHint;
+                      }
+                      if (btn) {
+                        btn.disabled = true;
+                        btn.setAttribute("aria-busy", "true");
+                        btn.classList.add("opacity-50", "cursor-not-allowed");
+                      }
+                      if (spinner) {
+                        spinner.classList.remove("hidden");
+                      }
+                      this.$wire[method](payload)
+                        .then(() => {})
+                        .catch(() => {})
+                        .finally(() => {
+                          if (btn) {
+                            btn.disabled = false;
+                            btn.removeAttribute("aria-busy");
+                            btn.classList.remove(
+                              "opacity-50",
+                              "cursor-not-allowed"
+                            );
+                          }
+                          if (spinner) {
+                            spinner.classList.add("hidden");
+                          }
+                        });
+                    }
+                  };
+
+                  const submitBtn = form.querySelector("[data-fgm-submit]");
+                  if (submitBtn) {
+                    submitBtn.addEventListener("click", handler);
+                  }
+                  form.addEventListener("submit", handler);
+                } catch (err) {}
+              }
+            );
+          } catch (e) {}
+        }
+      }
     },
     recenter: function (data) {
       this.map.panTo({ lat: data.lat, lng: data.lng });
