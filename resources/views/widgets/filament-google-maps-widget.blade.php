@@ -69,3 +69,8 @@
 
     <x-filament-actions::modals/>
 </x-filament-widgets::widget>
+@php
+    if ($this->getShouldUpdateMap()) {
+        $this->updateMapData();
+    }
+@endphp
