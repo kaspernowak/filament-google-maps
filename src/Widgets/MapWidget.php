@@ -34,6 +34,9 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?bool $clustering = true;
 
     protected static ?bool $fitToBounds = true;
+    protected static ?bool $drawPolylines = false;
+
+    protected static ?float $overlappingMarkerOffset = null;
 
     protected static ?int $zoom = null;
 
@@ -44,8 +47,10 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?string $markerAction = null;
 
     protected static ?string $icon = 'heroicon-o-map';
+    protected static ?bool $shouldUpdateMap = false;
 
     protected static bool $collapsible = false;
+    public ?bool $initialized = false;
 
     protected string $view = 'filament-google-maps::widgets.filament-google-maps-widget';
 
@@ -60,21 +65,24 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     ];
 
     protected array $mapConfig = [
-        'draggable' => false,
-        'center'    => [
+        'draggable'     => false,
+        'center'        => [
             'lat' => 15.3419776,
             'lng' => 44.2171392,
         ],
-        'zoom'       => 8,
-        'fit'        => true,
-        'gmaps'      => '',
-        'clustering' => true,
-        'mapConfig'  => [],
+        'zoom'          => 8,
+        'fit'           => true,
+        'gmaps'         => '',
+        'clustering'    => true,
+        'drawPolylines' => false,
+        'mapId'         => 'DEMO_MAP_ID',
+        'mapConfig'     => [],
     ];
 
     public function mount()
     {
-        $this->dataChecksum = md5('{}');
+        $this->dataChecksum = $this->generateDataChecksum();
+        $this->initialized = true;
     }
 
     protected function generateDataChecksum(): string
@@ -132,6 +140,21 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
         return static::$fitToBounds;
     }
 
+    protected function getDrawPolylines(): ?bool
+    {
+        return static::$drawPolylines;
+    }
+
+    protected function getOverlappingMarkerOffset(): ?float
+    {
+        return static::$overlappingMarkerOffset;
+    }
+
+    protected function getShouldUpdateMap(): ?bool
+    {
+        return static::$shouldUpdateMap;
+    }
+
     protected function getLayers(): array
     {
         return static::$layers;
@@ -156,6 +179,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     {
         return [
             'clustering'   => self::getClustering(),
+            'drawPolylines'=> $this->getDrawPolylines(),
             'layers'       => $this->getLayers(),
             'zoom'         => $this->getZoom(),
             'controls'     => $this->controls,
@@ -163,6 +187,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
             'markerAction' => $this->getMarkerAction(),
             'gmaps'        => MapsHelper::mapsUrl(),
             'mapConfig'    => [],
+            'overlappingMarkerOffset' => $this->getOverlappingMarkerOffset(),
         ];
     }
 
@@ -187,14 +212,16 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
 
     public function updateMapData()
     {
+        if (!$this->initialized) {
+            return;
+        }
+
         $newDataChecksum = $this->generateDataChecksum();
 
         if ($newDataChecksum !== $this->dataChecksum) {
             $this->dataChecksum = $newDataChecksum;
 
-            $this->dispatch('updateMapData', [
-                'data' => $this->getCachedData(),
-            ])->self();
+            $this->dispatch('updateMap', data: $this->getCachedData());
         }
     }
 

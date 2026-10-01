@@ -24,6 +24,9 @@
         }
     },
     "extra": {
+        "branch-alias": {
+            "dev-v4": "4.0.x-dev"
+        },
         "laravel": {
             "providers": [
                 "Cheesegrits\\FilamentGoogleMaps\\FilamentGoogleMapsServiceProvider"
