@@ -34,6 +34,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?bool $clustering = true;
 
     protected static ?bool $fitToBounds = true;
+
     protected static ?bool $drawPolylines = false;
 
     protected static ?float $overlappingMarkerOffset = null;
@@ -47,9 +48,11 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     protected static ?string $markerAction = null;
 
     protected static ?string $icon = 'heroicon-o-map';
+
     protected static ?bool $shouldUpdateMap = false;
 
     protected static bool $collapsible = false;
+
     public ?bool $initialized = false;
 
     protected string $view = 'filament-google-maps::widgets.filament-google-maps-widget';
@@ -65,8 +68,8 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     ];
 
     protected array $mapConfig = [
-        'draggable'     => false,
-        'center'        => [
+        'draggable' => false,
+        'center'    => [
             'lat' => 15.3419776,
             'lng' => 44.2171392,
         ],
@@ -82,7 +85,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     public function mount()
     {
         $this->dataChecksum = $this->generateDataChecksum();
-        $this->initialized = true;
+        $this->initialized  = true;
     }
 
     protected function generateDataChecksum(): string
@@ -178,15 +181,15 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
     public function getConfig(): array
     {
         return [
-            'clustering'   => self::getClustering(),
-            'drawPolylines'=> $this->getDrawPolylines(),
-            'layers'       => $this->getLayers(),
-            'zoom'         => $this->getZoom(),
-            'controls'     => $this->controls,
-            'fit'          => $this->getFitToBounds(),
-            'markerAction' => $this->getMarkerAction(),
-            'gmaps'        => MapsHelper::mapsUrl(),
-            'mapConfig'    => [],
+            'clustering'              => self::getClustering(),
+            'drawPolylines'           => $this->getDrawPolylines(),
+            'layers'                  => $this->getLayers(),
+            'zoom'                    => $this->getZoom(),
+            'controls'                => $this->controls,
+            'fit'                     => $this->getFitToBounds(),
+            'markerAction'            => $this->getMarkerAction(),
+            'gmaps'                   => MapsHelper::mapsUrl(),
+            'mapConfig'               => [],
             'overlappingMarkerOffset' => $this->getOverlappingMarkerOffset(),
         ];
     }
@@ -212,7 +215,7 @@ class MapWidget extends Widgets\Widget implements HasActions, HasForms
 
     public function updateMapData()
     {
-        if (!$this->initialized) {
+        if (! $this->initialized) {
             return;
         }
 

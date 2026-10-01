@@ -1,7 +1,36 @@
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
+import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import debounce from "underscore/modules/debounce.js";
 
+let googleMapsLibrariesPromise = null;
+
+export function loadGoogleMapsLibraries(apiKey) {
+  if (!googleMapsLibrariesPromise) {
+    setOptions({ key: apiKey });
+
+    googleMapsLibrariesPromise = Promise.all([
+      importLibrary("maps"),
+      importLibrary("places"),
+      importLibrary("marker"),
+      importLibrary("geometry"),
+    ])
+      .then(([maps, places, marker, geometry]) => ({
+        maps,
+        places,
+        marker,
+        geometry,
+      }))
+      .catch((error) => {
+        googleMapsLibrariesPromise = null;
+        throw error;
+      });
+  }
+
+  return googleMapsLibrariesPromise;
+}
+
 export default function filamentGoogleMapsWidget({
+  apiKey,
   cachedData,
   config,
   mapEl,
@@ -22,6 +51,9 @@ export default function filamentGoogleMapsWidget({
     isMapDragging: false,
     isIdleSkipped: false,
     programmaticClose: false,
+    mapsLibrary: null,
+    markerLibrary: null,
+    windowListeners: [],
     config: {
       center: {
         lat: 0,
@@ -46,68 +78,68 @@ export default function filamentGoogleMapsWidget({
       mapConfig: [],
     },
     loadGMaps: function () {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src =
-          this.config.gmaps +
-          "&map_id=" +
-          this.config.mapId +
-          "&callback=filamentGoogleMapsAsyncLoad";
-        document.head.appendChild(script);
-
-        window.filamentGoogleMapsAsyncLoad = () => {
-          resolve();
-        };
-
-        script.onerror = (error) => {
-          reject(error);
-        };
-      });
-
-      // When backend signals trip-stops-updated, ensure any open form UI is restored
-      window.addEventListener("trip-stops-updated", () => {
-        if (this.infoWindow && !this.infoWindow.get("closed")) {
-          const scopeEl =
-            document.querySelector(".info-window-content[data-fgm-scope]") ||
-            document.querySelector("[data-fgm-scope]") ||
-            null;
-          const form = scopeEl
-            ? scopeEl.querySelector("[data-fgm-form]")
-            : document.querySelector("[data-fgm-form]");
-          if (!form) return;
-          const btn = form.querySelector("[data-fgm-submit]");
-          const spinner = btn ? btn.querySelector(".fgm-spinner") : null;
-          if (btn) {
-            btn.disabled = false;
-            btn.removeAttribute("aria-busy");
-            btn.classList.remove("opacity-50", "cursor-not-allowed");
-          }
-          if (spinner) {
-            spinner.classList.add("hidden");
-          }
-        }
-      });
+      return loadGoogleMapsLibraries(apiKey);
     },
     init: async function () {
       this.mapEl = document.getElementById(mapEl) || mapEl;
       this.data = cachedData;
       this.config = { ...this.config, ...config };
-      this.createMap();
+      await this.createMap();
+    },
+    destroy: function () {
+      this.windowListeners.forEach(({ eventName, listener }) => {
+        window.removeEventListener(eventName, listener);
+      });
+      this.windowListeners = [];
+    },
+    addWindowListener: function (eventName, listener) {
+      window.addEventListener(eventName, listener);
+      this.windowListeners.push({ eventName, listener });
+    },
+    findInfoWindowForm: function () {
+      const scopeEl =
+        document.querySelector(".info-window-content[data-fgm-scope]") ||
+        document.querySelector("[data-fgm-scope]") ||
+        null;
+
+      return scopeEl
+        ? scopeEl.querySelector("[data-fgm-form]")
+        : document.querySelector("[data-fgm-form]");
+    },
+    restoreInfoWindowFormState: function () {
+      if (!this.infoWindow || this.infoWindow.get("closed")) {
+        return;
+      }
+
+      const form = this.findInfoWindowForm();
+      if (!form) {
+        return;
+      }
+
+      const button = form.querySelector("[data-fgm-submit]");
+      const spinner = button?.querySelector(".fgm-spinner") ?? null;
+
+      if (button) {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        button.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+      spinner?.classList.add("hidden");
     },
     callWire: function (thing) {},
     createMap: async function () {
-      if (!window.google || !window.google.maps) {
-        await this.loadGMaps();
-      }
+      const libraries = await this.loadGMaps();
+      this.mapsLibrary = libraries.maps;
+      this.markerLibrary = libraries.marker;
 
-      this.infoWindow = new google.maps.InfoWindow({
+      this.infoWindow = new this.mapsLibrary.InfoWindow({
         content: "",
         disableAutoPan: true,
       });
 
       this.infoWindow.set("closed", true);
 
-      this.map = new google.maps.Map(this.mapEl, {
+      this.map = new this.mapsLibrary.Map(this.mapEl, {
         center: this.config.center,
         zoom: this.config.zoom,
         mapId: this.config.mapId,
@@ -129,33 +161,27 @@ export default function filamentGoogleMapsWidget({
 
       this.addMapClickListener();
 
-      window.addEventListener(
+      this.addWindowListener(
         "filament-google-maps::widget/setMapCenter",
         (event) => {
           this.recenter(event.detail);
-        }
+        },
       );
 
-      window.addEventListener("updateMap", (event) => {
+      this.addWindowListener("updateMap", (event) => {
         this.update(
           event.detail.data,
           event.detail.openId,
-          event.detail.focusField
+          event.detail.focusField,
         );
       });
 
       // Update InfoWindow inputs to reflect server-authoritative values
-      window.addEventListener("fgm-update-stop-inputs", (event) => {
+      this.addWindowListener("fgm-update-stop-inputs", (event) => {
         const { id, route_id, sequence, focus } = event.detail || {};
         if (!id) return;
         if (this.infoWindow && !this.infoWindow.get("closed")) {
-          const scopeEl =
-            document.querySelector(".info-window-content[data-fgm-scope]") ||
-            document.querySelector("[data-fgm-scope]") ||
-            null;
-          const form = scopeEl
-            ? scopeEl.querySelector("[data-fgm-form]")
-            : document.querySelector("[data-fgm-form]");
+          const form = this.findInfoWindowForm();
           if (!form) return;
           const formIdAttr = form.getAttribute("data-id");
           const formId = formIdAttr ? parseInt(formIdAttr, 10) : null;
@@ -175,8 +201,8 @@ export default function filamentGoogleMapsWidget({
             focus === "sequence"
               ? seqInput
               : focus === "route_id"
-              ? routeInput
-              : null;
+                ? routeInput
+                : null;
           if (targetEl && typeof targetEl.focus === "function") {
             setTimeout(() => {
               try {
@@ -188,16 +214,12 @@ export default function filamentGoogleMapsWidget({
           }
 
           // Always restore UI state on event, in case a previous submit left it disabled
-          const btn = form.querySelector("[data-fgm-submit]");
-          const spinner = btn ? btn.querySelector(".fgm-spinner") : null;
-          if (btn) {
-            btn.disabled = false;
-            btn.classList.remove("opacity-50", "cursor-not-allowed");
-          }
-          if (spinner) {
-            spinner.classList.add("hidden");
-          }
+          this.restoreInfoWindowFormState();
         }
+      });
+
+      this.addWindowListener("trip-stops-updated", () => {
+        this.restoreInfoWindowFormState();
       });
 
       this.show(true);
@@ -208,14 +230,14 @@ export default function filamentGoogleMapsWidget({
         if (!this.isMapDragging && document.fullscreenElement) {
           const existingClonedModal = document.querySelector(".cloned-modal");
           const originalModalContainer = document.querySelector(
-            ".marker-action-modal"
+            ".marker-action-modal",
           );
 
           // Only proceed if the original modal container exists
           if (originalModalContainer) {
             const originalModalCancelButton =
               originalModalContainer.querySelector(
-                'button[x-on\\:click="close()"]'
+                'button[x-on\\:click="close()"]',
               );
 
             /* if (existingClonedModal) {
@@ -252,7 +274,7 @@ export default function filamentGoogleMapsWidget({
       });
     },
     createMarkerContent: async function (location) {
-      const { PinElement } = await google.maps.importLibrary("marker");
+      const { PinElement } = this.markerLibrary;
       let content = null;
       let pinOptions = {};
 
@@ -275,7 +297,7 @@ export default function filamentGoogleMapsWidget({
         const parser = new DOMParser();
         const svgElement = parser.parseFromString(
           svgString,
-          "image/svg+xml"
+          "image/svg+xml",
         ).documentElement;
         if (scale && Array.isArray(scale) && scale.length === 2) {
           svgElement.setAttribute("width", `${scale[0]}px`);
@@ -314,7 +336,7 @@ export default function filamentGoogleMapsWidget({
           const imageElement = createImageElement(
             location.icon.url,
             location.icon.type,
-            location.icon.scale
+            location.icon.scale,
           );
           if (location.icon.hasOwnProperty("glyph") && location.icon.glyph) {
             pinOptions = createPinOptions({ glyph: imageElement });
@@ -324,7 +346,7 @@ export default function filamentGoogleMapsWidget({
         } else if (location.icon.hasOwnProperty("svg")) {
           const svgElement = createSvgElement(
             location.icon.svg,
-            location.icon.scale
+            location.icon.scale,
           );
           if (location.icon.glyph) {
             pinOptions = createPinOptions({ glyph: svgElement });
@@ -381,9 +403,7 @@ export default function filamentGoogleMapsWidget({
       return contentElement;
     },
     createMarker: async function (location) {
-      const { AdvancedMarkerElement } = await google.maps.importLibrary(
-        "marker"
-      );
+      const { AdvancedMarkerElement } = this.markerLibrary;
       const content = await this.createMarkerContent(location);
       const headerContent = location.header ?? location.label ?? "";
       const marker = new AdvancedMarkerElement({
@@ -445,7 +465,7 @@ export default function filamentGoogleMapsWidget({
     },
     applyOverlappingOffset: function () {
       const offsetDistance = parseFloat(
-        this.config.overlappingMarkerOffset ?? 0
+        this.config.overlappingMarkerOffset ?? 0,
       );
 
       if (!offsetDistance || offsetDistance <= 0) {
@@ -512,7 +532,7 @@ export default function filamentGoogleMapsWidget({
           const offsetPoint = google.maps.geometry.spherical.computeOffset(
             centerLatLng,
             offsetDistance,
-            angle
+            angle,
           );
 
           entry.location.lat = offsetPoint.lat();
@@ -550,7 +570,7 @@ export default function filamentGoogleMapsWidget({
               // Try to scope to our content root if provided
               const scopeEl =
                 document.querySelector(
-                  ".info-window-content[data-fgm-scope]"
+                  ".info-window-content[data-fgm-scope]",
                 ) ||
                 document.querySelector("[data-fgm-scope]") ||
                 null;
@@ -587,7 +607,7 @@ export default function filamentGoogleMapsWidget({
                   payload.id = id;
                 }
                 const fields = form.querySelectorAll(
-                  "input[name], select[name], textarea[name]"
+                  "input[name], select[name], textarea[name]",
                 );
                 fields.forEach((el) => {
                   const name = el.name;
@@ -658,7 +678,7 @@ export default function filamentGoogleMapsWidget({
                         btn.removeAttribute("aria-busy");
                         btn.classList.remove(
                           "opacity-50",
-                          "cursor-not-allowed"
+                          "cursor-not-allowed",
                         );
                       }
                       if (spinner) {
@@ -689,12 +709,12 @@ export default function filamentGoogleMapsWidget({
 
           // Ensure any existing cloned modal is removed
           const originalModalContainer = document.querySelector(
-            ".marker-action-modal"
+            ".marker-action-modal",
           );
           if (originalModalContainer) {
             const originalModalCancelButton =
               originalModalContainer.querySelector(
-                'button[x-on\\:click="close()"]'
+                'button[x-on\\:click="close()"]',
               );
             //existingClonedModal.remove();
             //this.programmaticClose = true; // Set flag
@@ -716,7 +736,7 @@ export default function filamentGoogleMapsWidget({
             "z-50",
             "flex",
             "items-center",
-            "justify-center"
+            "justify-center",
           );
 
           // Create the spinner element using Tailwind CSS classes
@@ -745,7 +765,7 @@ export default function filamentGoogleMapsWidget({
                 if (document.fullscreenElement) {
                   // Find the specific modal container using the class
                   const modalContainer = document.querySelector(
-                    ".marker-action-modal"
+                    ".marker-action-modal",
                   );
 
                   if (modalContainer && document.fullscreenElement) {
@@ -767,10 +787,10 @@ export default function filamentGoogleMapsWidget({
 
                       // Attach click listener to the "Cancel" button
                       const cancelButton = clonedModal.querySelector(
-                        'button[x-on\\:click="close()"]'
+                        'button[x-on\\:click="close()"]',
                       );
                       const originalCancelButton = modalContainer.querySelector(
-                        'button[x-on\\:click="close()"]'
+                        'button[x-on\\:click="close()"]',
                       );
 
                       if (cancelButton) {
@@ -830,7 +850,7 @@ export default function filamentGoogleMapsWidget({
             (loc.location.lat === marker.position.lat &&
               loc.location.lng === marker.position.lng) ||
             (loc.origin?.location.lat === marker.position.lat &&
-              loc.origin?.location.lng === marker.position.lng)
+              loc.origin?.location.lng === marker.position.lng),
         );
 
         if (
@@ -863,8 +883,8 @@ export default function filamentGoogleMapsWidget({
           !updatedMarkers.some(
             (marker) =>
               marker.position.lat === loc.location.lat &&
-              marker.position.lng === loc.location.lng
-          )
+              marker.position.lng === loc.location.lng,
+          ),
       );
 
       for (const location of newLocations) {
@@ -878,12 +898,12 @@ export default function filamentGoogleMapsWidget({
           !updatedMarkers.some(
             (marker) =>
               marker.position.lat === location.origin.location.lat &&
-              marker.position.lng === location.origin.location.lng
+              marker.position.lng === location.origin.location.lng,
           )
         ) {
           const originMarker = await this.createMarker(location.origin);
           this.createMarkerListener(originMarker);
-          originMarker.setMap(Alpine.raw(this.map));
+          originMarker.map = Alpine.raw(this.map);
           updatedMarkers.push(originMarker);
         }
       }
@@ -908,7 +928,7 @@ export default function filamentGoogleMapsWidget({
           const segmentLength =
             google.maps.geometry.spherical.computeDistanceBetween(
               new google.maps.LatLng(start.lat, start.lng),
-              new google.maps.LatLng(end.lat, end.lng)
+              new google.maps.LatLng(end.lat, end.lng),
             );
           polylineLengths.push(segmentLength);
           totalPolylineLength += segmentLength;
@@ -1009,8 +1029,8 @@ export default function filamentGoogleMapsWidget({
                   polylineCoords.some(
                     (polylineCoord) =>
                       polylineCoord.lat === marker.position.lat &&
-                      polylineCoord.lng === marker.position.lng
-                  )
+                      polylineCoord.lng === marker.position.lng,
+                  ),
                 );
                 if (isAnyMarkerOnPolyline) {
                   polylineShouldBeVisible = false;
@@ -1019,7 +1039,7 @@ export default function filamentGoogleMapsWidget({
               }
             }
             polyline.setMap(
-              polylineShouldBeVisible ? Alpine.raw(this.map) : null
+              polylineShouldBeVisible ? Alpine.raw(this.map) : null,
             );
           });
         });
@@ -1197,36 +1217,35 @@ export default function filamentGoogleMapsWidget({
     },
     idle: function () {
       if (this.config.mapIsFilter) {
-        let that = self;
         const debouncedMoved = debounce(this.moved, 1000).bind(this);
 
         google.maps.event.addListener(this.map, "idle", (event) => {
-          if (self.isMapDragging) {
-            self.idleSkipped = true;
+          if (this.isMapDragging) {
+            this.isIdleSkipped = true;
             return;
           }
-          self.idleSkipped = false;
+          this.isIdleSkipped = false;
           debouncedMoved();
         });
         google.maps.event.addListener(this.map, "dragstart", (event) => {
-          self.isMapDragging = true;
+          this.isMapDragging = true;
         });
         google.maps.event.addListener(this.map, "dragend", (event) => {
-          self.isMapDragging = false;
-          if (self.idleSkipped === true) {
+          this.isMapDragging = false;
+          if (this.isIdleSkipped === true) {
             debouncedMoved();
-            self.idleSkipped = false;
+            this.isIdleSkipped = false;
           }
         });
         google.maps.event.addListener(this.map, "bounds_changed", (event) => {
-          self.idleSkipped = false;
+          this.isIdleSkipped = false;
         });
       } else {
         google.maps.event.addListener(this.map, "dragstart", (event) => {
-          self.isMapDragging = true;
+          this.isMapDragging = true;
         });
         google.maps.event.addListener(this.map, "dragend", (event) => {
-          self.isMapDragging = false;
+          this.isMapDragging = false;
         });
       }
     },
@@ -1266,7 +1285,7 @@ export default function filamentGoogleMapsWidget({
                 try {
                   const scopeEl =
                     document.querySelector(
-                      ".info-window-content[data-fgm-scope]"
+                      ".info-window-content[data-fgm-scope]",
                     ) ||
                     document.querySelector("[data-fgm-scope]") ||
                     null;
@@ -1276,13 +1295,17 @@ export default function filamentGoogleMapsWidget({
                   if (!form) return;
 
                   // Focus desired field on reopen
-                  const routeInput = form.querySelector('input[name="route_id"]');
+                  const routeInput = form.querySelector(
+                    'input[name="route_id"]',
+                  );
                   const seqInput = form.querySelector('input[name="sequence"]');
                   const targetEl =
-                    focusField === 'sequence'
+                    focusField === "sequence"
                       ? seqInput
-                      : (focusField === 'route_id' ? routeInput : null);
-                  if (targetEl && typeof targetEl.focus === 'function') {
+                      : focusField === "route_id"
+                        ? routeInput
+                        : null;
+                  if (targetEl && typeof targetEl.focus === "function") {
                     setTimeout(() => {
                       try {
                         targetEl.focus({ preventScroll: true });
@@ -1308,7 +1331,7 @@ export default function filamentGoogleMapsWidget({
                     const payload = {};
                     if (id) payload.id = id;
                     const fields = form.querySelectorAll(
-                      "input[name], select[name], textarea[name]"
+                      "input[name], select[name], textarea[name]",
                     );
                     fields.forEach((el) => {
                       const name = el.name;
@@ -1367,7 +1390,7 @@ export default function filamentGoogleMapsWidget({
                             btn.removeAttribute("aria-busy");
                             btn.classList.remove(
                               "opacity-50",
-                              "cursor-not-allowed"
+                              "cursor-not-allowed",
                             );
                           }
                           if (spinner) {
@@ -1383,7 +1406,7 @@ export default function filamentGoogleMapsWidget({
                   }
                   form.addEventListener("submit", handler);
                 } catch (err) {}
-              }
+              },
             );
           } catch (e) {}
         }

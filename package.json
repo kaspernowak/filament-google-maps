@@ -6,14 +6,19 @@
   "private": true,
   "scripts": {
     "build:js": "node bin/build.js",
-    "build:css": "npx @tailwindcss/cli -i ./resources/css/filament-google-maps.css -o ./dist/cheesegrits/filament-google-maps/filament-google-maps.css --minify",
+    "build:css": "tailwindcss -i ./resources/css/filament-google-maps.css -o ./dist/cheesegrits/filament-google-maps/filament-google-maps.css --minify",
     "dev:js": "node bin/build.js --dev",
-    "dev:css": "npx @tailwindcss/cli -i ./resources/css/filament-google-maps.css -o ./dist/cheesegrits/filament-google-maps/filament-google-maps.css --watch",
-    "dev": "npm-run-all --parallel dev:*",
-    "build": "npm-run-all build:*"
+    "dev:css": "tailwindcss -i ./resources/css/filament-google-maps.css -o ./dist/cheesegrits/filament-google-maps/filament-google-maps.css --watch",
+    "dev": "concurrently npm:dev:js npm:dev:css",
+    "build": "npm run build:js && npm run build:css",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@types/googlemaps": "^3.43.3",
+    "concurrently": "^9.2.1",
+    "happy-dom": "^20.14.5",
+    "vitest": "^4.1.11",
     "postcss": "^8.1.14"
   },
   "dependencies": {
@@ -21,12 +26,11 @@
     "@googlemaps/js-api-loader": "^2.0.2",
     "@googlemaps/markerclusterer": "^2.0.13",
     "esbuild": "^0.25.0",
-    "npm-run-all": "^4.1.5",
     "postcss": "^8.4.31",
     "prettier": "^3.0",
     "prettier-plugin-blade": "^2.0",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4.1.18",
-    "underscore": "^1.13.6"
+    "underscore": "^1.13.8"
   }
 }
