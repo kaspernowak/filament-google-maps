@@ -62,7 +62,7 @@ class MapsHelper
         $libraries = implode(',', array_unique(
             array_filter(
                 array_merge(
-                    ['places', 'marker', 'geometry'],
+                    ['places'],
                     explode(',', config('filament-google-maps.libraries')),
                     $libraries
                 )

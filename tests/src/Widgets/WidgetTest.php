@@ -70,13 +70,11 @@ it('keeps the DEMO_MAP_ID default in the merged map config', function () {
     expect($config['mapId'])->toBe('DEMO_MAP_ID');
 });
 
-it('requests the marker and geometry libraries', function () {
+it('keeps the legacy script URL limited to the places library', function () {
     $url = MapsHelper::mapsUrl();
 
     parse_str(parse_url($url, PHP_URL_QUERY), $query);
     $libraries = explode(',', $query['libraries']);
 
-    expect($libraries)->toContain('places')
-        ->toContain('marker')
-        ->toContain('geometry');
+    expect($libraries)->toBe(['places']);
 });
